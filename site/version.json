@@ -1,0 +1,7 @@
+{
+ "versionCode": 6,
+ "versionName": "1.2.0",
+ "apk": "RytmMobile-1.2.0.apk",
+ "sha256": "4b1223659e6e0549e9ba87a6aeab296ed0574441e7cf1e4ddc92f824b8c93e9d",
+ "notes": "Updates itself: when a new version is out, tap Update. Also reconnects to the Rytm after an unplug, and keeps your sample when you rotate or fold the phone."
+}
