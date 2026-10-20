@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Elektron Music Machine MAV AB, USB vendor id 0x1935 -->
+    <usb-device vendor-id="6453" />
+</resources>

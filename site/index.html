@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Rytm Mobile</title>
+<meta name="description" content="Send samples to an Elektron Analog Rytm MK1 from an Android phone, and split tracks into stems.">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #12181a; --panel: #1c2528; --well: #222c2f; --line: #3e494b;
+  --ink: #e4eae8; --muted: #a2abaa; --cv: #f0b429; --signal: #ff7467; --audio: #7ab8f5; --shade: #0b0f10;
+  --display: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: var(--audio); }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 64px 44px; position: relative; }
+.wrap::before { content: ""; position: absolute; left: 18px; top: 0; bottom: 0; width: 2px; background: color-mix(in srgb, var(--signal) 75%, transparent); }
+.kicker { font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--signal); }
+header { padding: 48px 0 8px; position: relative; }
+header .node { position: absolute; left: -33px; top: 92px; width: 16px; height: 16px; border-radius: 50%; background: var(--signal); border: 2px solid var(--shade); }
+h1 { font: 700 clamp(56px, 13vw, 96px)/.9 var(--display); letter-spacing: .01em; text-transform: uppercase; margin: 14px 0 18px; }
+.lede { font-size: 18px; max-width: 34em; margin: 0 0 28px; }
+.dl { display: inline-block; text-decoration: none; position: relative; margin: 0 6px 6px 0; }
+.dl span { display: block; position: relative; z-index: 1; background: var(--signal); color: var(--bg); border: 2px solid var(--shade); border-radius: 999px;
+  padding: 14px 28px; font: 700 22px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; transition: transform .06s; }
+.dl::after { content: ""; position: absolute; inset: 0; transform: translate(5px, 5px); background: var(--shade); border-radius: 999px; }
+.dl:active span { transform: translate(5px, 5px); }
+.meta { font: 13px/1.6 var(--mono); color: var(--muted); margin-top: 14px; word-break: break-all; }
+.meta b { color: var(--ink); font-weight: 500; }
+.print { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 2px 14px 2px 14px; margin: 36px 0; }
+h2 { font: 700 30px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 52px 0 16px; position: relative; scroll-margin-top: 16px; }
+h2::before { content: ""; position: absolute; left: -31px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--cv); border: 2px solid var(--shade); }
+h3 { font: 700 21px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 28px 0 10px; color: var(--muted); }
+.intro { margin: 0 0 16px; max-width: 36em; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin: 0 0 14px; }
+.panel .head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 14px; background: var(--well); border-bottom: 1px solid var(--line); }
+.panel .head .bar { width: 3px; height: 18px; }
+.panel .head strong { font: 700 21px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.panel .head small { font: 12px/1 var(--mono); color: var(--muted); }
+.panel .body { padding: 14px; }
+.panel p { margin: 0; }
+.panel p + p, .panel p + ul, .panel ul + p, .panel p + .cmd, .panel .cmd + p { margin-top: 10px; }
+.jack { width: 22px; height: 22px; border-radius: 50%; background: var(--bg); border: 4px solid currentColor; box-shadow: 0 0 0 2px var(--shade); flex: none; position: relative; }
+.jack::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: currentColor; }
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+ol.steps li::before { content: counter(s, decimal-leading-zero); font: 500 14px/1.6 var(--mono); color: var(--cv); border: 1px solid color-mix(in srgb, var(--cv) 60%, transparent); border-radius: 3px; text-align: center; height: 28px; }
+ol.steps li > * { min-width: 0; }
+ul.need { padding-left: 18px; margin: 0; }
+ul.need li { margin: 6px 0; }
+code { font: 14px var(--mono); background: var(--well); padding: 1px 6px; border-radius: 3px; overflow-wrap: anywhere; }
+.cmd { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.cmd pre { flex: 1 1 240px; min-width: 0; margin: 0; padding: 12px 14px; background: var(--shade); border: 1px solid var(--line); border-left: 3px solid var(--audio); border-radius: 4px;
+  font: 14px/1.5 var(--mono); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cmd pre::before { content: "$ "; color: var(--muted); }
+.cmd button { flex: 0 0 auto; min-width: 88px; min-height: 44px; padding: 0 16px; cursor: pointer; background: var(--audio); color: var(--bg); border: 2px solid var(--shade); border-radius: 4px;
+  font: 700 18px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; }
+.cmd button:active { transform: translate(2px, 2px); }
+.cmd button:focus-visible, .dl:focus-visible { outline: 3px solid var(--cv); outline-offset: 3px; }
+.copied { display: block; min-height: 1.6em; font: 13px/1.6 var(--mono); color: var(--muted); }
+.note { border-left: 3px solid var(--cv); padding: 2px 0 2px 12px; margin: 14px 0 0; color: var(--muted); }
+.steps16 { display: grid; grid-template-columns: repeat(16, 1fr); gap: 4px; margin: 26px 0 0; max-width: 420px; }
+.steps16 i { aspect-ratio: 1; border: 2px solid color-mix(in srgb, var(--cv) 55%, transparent); border-radius: 3px; }
+.steps16 i:nth-child(4n+1) { border-color: var(--cv); }
+.steps16 i.on { background: var(--signal); }
+footer { margin-top: 56px; font: 13px/1.6 var(--mono); color: var(--muted); }
+@media (max-width: 480px) { .wrap { padding-left: 38px; } .wrap::before { left: 14px; } header .node { left: -31px; top: 86px; } h2::before { left: -30px; } .cmd button { flex: 1 1 100%; } }
+@media (prefers-reduced-motion: reduce) { .dl span, .cmd button { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <span class="node"></span>
+    <div class="kicker">Analog Rytm MK1 · Android</div>
+    <h1>Rytm<br>Mobile</h1>
+    <p class="lede">Get any sound into your Rytm from your phone. Chop a voice memo, a screen recording or a whole track, split it into stems, and send it straight to +Drive over USB.</p>
+    <a class="dl" href="RytmMobile-1.1.2.apk" download><span>Download APK</span></a>
+    <div class="meta"><b>v1.1.2</b> · 2.7 MB · Android 10+<br>SHA‑256 <b>1d813861344df1bed830bab890ae7db375593e27bd5b41463be7a1d456f742d9</b></div>
+    <div class="steps16" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i></div>
+  </header>
+
+  <img class="print" src="connect.webp" alt="A drum machine connected to a phone by a USB cable" width="1200" height="670">
+
+  <h2 id="what">What it does</h2>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--signal)"></span><strong>Rytm</strong><small>+Drive transfer</small></div>
+    <div class="body"><p>Browse the Rytm's +Drive, make folders, delete samples, and send new ones over USB. It speaks Elektron's own SysEx file protocol, ported from Elektroid.</p></div></div>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--cv)"></span><strong>Chop</strong><small>trim and send</small></div>
+    <div class="body"><p>Open any audio or video file: MP3, WAV, M4A, FLAC, screen recordings or voice memos. Trim it on the waveform and send it. The app converts it to 48 kHz, 16‑bit mono, with clean resampling and dither.</p></div></div>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--audio)"></span><strong>Split</strong><small>stem separation</small></div>
+    <div class="body"><p>Split a track into drums, bass, guitar, piano, other and vocals, or a drum stem into kick, snare, toms and cymbals. Stems land in a +Drive folder, ready to load. The splitting itself happens on your own computer at home, which your phone reaches over Wi‑Fi, or from anywhere with Tailscale. <a href="#setup">Set it up below.</a></p></div></div>
+
+  <h2 id="install">Install</h2>
+  <ol class="steps">
+    <li><span>On the phone, tap <b>Download APK</b> above.</span></li>
+    <li><span>Open the downloaded file. Android asks whether your browser or file app may install apps. Allow it for that app only.</span></li>
+    <li><span>Play Protect may warn you that it doesn't know this developer. The app isn't on the Play Store, so that's expected. Choose to install anyway.</span></li>
+    <li><span>Optional: check that the file's SHA‑256 matches the one above.</span></li>
+    <li><span>Already have an earlier 1.x? Just install this one over it, like any update. It's signed with the same key, so you don't need to uninstall anything.</span></li>
+    <li><span>Still on one of the very first test builds (the debug ones)? Uninstall that one first. It was signed with a different key, so Android won't install over it.</span></li>
+  </ol>
+
+  <h2 id="need">You need</h2>
+  <div class="panel"><div class="body">
+    <ul class="need">
+      <li>An Analog Rytm MK1 with its USB mode set to USB MIDI.</li>
+      <li>A USB‑C OTG cable or adapter from the phone to the Rytm's USB port.</li>
+      <li>Android 10 or newer.</li>
+      <li>For Split only: a Mac or Linux computer running the stem server. <a href="#setup">Setting it up</a> takes one command.</li>
+    </ul>
+  </div></div>
+
+  <h2 id="setup">Set up your computer</h2>
+  <p class="intro">You only need this for <b>Split</b>. Sending and chopping samples work with just the phone and the Rytm.</p>
+
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--audio)"></span><strong>The stem server</strong><small>what and why</small></div>
+    <div class="body">
+      <p>Splitting a track into stems takes far more power than a phone has, so it runs on a real computer. You install a small program, the <b>stem server</b>, on a computer at home. It sits quietly in the background. When you split a track, your phone sends it to the computer, the computer does the work, and the stems come back to the phone.</p>
+    </div></div>
+
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--cv)"></span><strong>Your computer needs</strong><small>requirements</small></div>
+    <div class="body">
+      <ul class="need">
+        <li>A <b>Mac</b> or a <b>Linux PC</b>. Macs with Apple silicon (M1 or newer) are fastest. Intel Macs work, but splitting is much slower, the 6-stem split uses an older model (HTDemucs), and the drum-kit split isn't available.</li>
+        <li>A compiler, for one small part the installer builds. On a Mac, if it's missing, the installer asks you to run <code>xcode-select --install</code> once. On Linux: <code>sudo apt install build-essential</code> (Ubuntu, Debian, Mint), <code>sudo dnf install gcc</code> (Fedora) or <code>sudo pacman -S gcc</code> (Arch).</li>
+        <li>About <b>2 GB</b> of free disk space to start, and up to about <b>3.5 GB</b> once you've used every split mode. Each mode downloads its model the first time you use it: vocals about 900 MB, drum kit about 440 MB, 4 stems about 340 MB.</li>
+        <li>An internet connection for the install.</li>
+        <li>On Linux, an NVIDIA graphics card is used automatically if it has its driver installed. You don't have to set anything.</li>
+      </ul>
+    </div></div>
+
+  <h3>Install it</h3>
+  <ol class="steps">
+    <li><span>Open <b>Terminal</b>. On a Mac it's in Applications › Utilities, or search for “Terminal” with Spotlight. On Linux, open your terminal app.</span></li>
+    <li><div>Copy this line, paste it into Terminal and press Return:
+      <div class="cmd"><pre id="install-cmd">curl -fsSL https://rytm-mobile.pages.dev/install.sh | bash</pre><button type="button" data-copy="install-cmd" aria-describedby="install-cmd-status">Copy</button></div>
+      <span class="copied" id="install-cmd-status" role="status" aria-live="polite"></span></div></li>
+    <li><span>Wait a few minutes. It sets up about 2 GB of files, including a 700 MB model, so a slow connection takes longer. You don't need to answer anything.</span></li>
+    <li><span>When it says <b>Done</b>, it prints a square pairing code made of blocks. Leave the window open and <a href="#pair">pair the app</a>.</span></li>
+  </ol>
+
+  <div class="panel" style="margin-top:18px"><div class="head"><span class="jack" style="color:var(--signal)"></span><strong>What the installer does</strong></div>
+    <div class="body">
+      <ul class="need">
+        <li>Puts the server, its own copy of Python and its models in one folder, <code>~/.rytm-stems</code>, in your home folder. Outside that folder it only adds a small Python helper (uv) and the setting that starts the server at login. It leaves your system's Python alone.</li>
+        <li>Starts the stem server in the background. There's no window or app to keep open.</li>
+        <li>Starts it again by itself every time you log in, so it's always ready.</li>
+        <li>Downloads the main splitting model (about 700 MB) once, so your first split doesn't have to wait for it.</li>
+      </ul>
+      <p class="note">Running the same line again updates the server. It keeps your pairing, your models and your finished splits.</p>
+    </div></div>
+
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--cv)"></span><strong>Later</strong><small>pair again · uninstall</small></div>
+    <div class="body">
+      <p>To see the pairing code again (on a new phone, or after setting up Tailscale), run this in Terminal:</p>
+      <div class="cmd"><pre id="pair-cmd">~/.rytm-stems/pair</pre><button type="button" data-copy="pair-cmd" aria-describedby="pair-cmd-status">Copy</button></div>
+      <span class="copied" id="pair-cmd-status" role="status" aria-live="polite"></span>
+      <p>To remove the stem server, run this. It stops the server, stops it starting at login, and moves its folder aside instead of deleting it. It prints where the folder went; delete that folder yourself when you want the disk space back.</p>
+      <div class="cmd"><pre id="uninstall-cmd">~/.rytm-stems/uninstall</pre><button type="button" data-copy="uninstall-cmd" aria-describedby="uninstall-cmd-status">Copy</button></div>
+      <span class="copied" id="uninstall-cmd-status" role="status" aria-live="polite"></span>
+    </div></div>
+
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--muted)"></span><strong>Windows</strong><small>not yet</small></div>
+    <div class="body"><p>Windows isn't supported yet. For now you need a Mac or a Linux PC for splitting. Everything else in the app works without a computer.</p></div></div>
+
+  <h2 id="pair">Pair the app</h2>
+  <p class="intro">Pairing tells the app where your computer is and gives it the password (the <b>token</b>) for your stem server. You do it once.</p>
+  <ol class="steps">
+    <li><span>Install Rytm Mobile on the phone first (<a href="#install">see above</a>).</span></li>
+    <li><span>Point the phone's camera at the pairing code in Terminal and tap the link it shows. If the camera won't read it, send yourself the <code>rytmmobile://pair…</code> link printed under the code, then open it on the phone.</span></li>
+    <li><span>Rytm Mobile opens, and its <b>Split</b> tab fills in the server and token by itself.</span></li>
+    <li><span>Try a split. If it can't reach your computer, see <a href="#help">Troubleshooting</a>.</span></li>
+  </ol>
+  <p class="note">The pairing code holds your token. Treat it like a password: don't post a photo of it.</p>
+
+  <h2 id="away">Use it away from home</h2>
+  <p class="intro">Right after install, the phone can reach your computer only on the same Wi‑Fi. To split from anywhere, use <b>Tailscale</b>, a free app that links your own devices privately over the internet.</p>
+  <ol class="steps">
+    <li><span>Install Tailscale on the computer and on the phone: <a href="https://tailscale.com/download">tailscale.com/download</a>.</span></li>
+    <li><span>Sign in to the <b>same account</b> on both.</span></li>
+    <li><span>On the computer, run <code>~/.rytm-stems/pair</code> in Terminal again. The new code uses the Tailscale address.</span></li>
+    <li><span>Scan the new code with the phone, like the first time. Now it works on mobile data or any Wi‑Fi, as long as Tailscale is on.</span></li>
+  </ol>
+
+  <h2 id="help">Troubleshooting</h2>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--signal)"></span><strong>Can't reach the computer</strong></div>
+    <div class="body">
+      <ul class="need">
+        <li>Away from home: Tailscale must be on, and signed in to the same account, on <b>both</b> the phone and the computer.</li>
+        <li>At home without Tailscale: the phone must be on the same Wi‑Fi as the computer.</li>
+        <li>The computer must be on and awake. A Mac running on battery goes to sleep, and the stem server sleeps with it. Keep it plugged in and awake.</li>
+        <li>Set up Tailscale after pairing? Run <code>~/.rytm-stems/pair</code> and scan again.</li>
+      </ul>
+    </div></div>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--cv)"></span><strong>Wrong token</strong></div>
+    <div class="body"><p>The app's saved token doesn't match the computer's, usually after a reinstall or a new phone. Run <code>~/.rytm-stems/pair</code> on the computer and scan the code again.</p></div></div>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--audio)"></span><strong>First split is slow</strong></div>
+    <div class="body"><p>If the model download didn't finish during install, the first split downloads it (about 700 MB). That happens once. After that, splits start right away. Intel Macs are also much slower than Apple silicon at splitting.</p></div></div>
+  <div class="panel"><div class="head"><span class="jack" style="color:var(--signal)"></span><strong>Rytm not responding</strong></div>
+    <div class="body">
+      <ul class="need">
+        <li>In the Rytm's settings, set the USB mode to <b>USB MIDI</b>.</li>
+        <li>Check the Rytm's MIDI port settings allow USB, so it sends and receives over the USB port and not just the MIDI sockets.</li>
+        <li>Use an OTG cable or adapter, and plug it straight into the phone.</li>
+      </ul>
+    </div></div>
+
+  <img class="print" src="stems.webp" alt="A waveform splitting into four patch cables" width="1200" height="670">
+
+  <footer>
+    The transfer protocol is ported from <a href="https://github.com/dagargo/elektroid">Elektroid</a> (GPL‑3.0). Stems use BS‑RoFormer SW, Mel‑Band RoFormer, HTDemucs and MDX23C DrumSep through python‑audio‑separator.<br>
+    Not affiliated with Elektron.
+  </footer>
+</main>
+<script>
+document.querySelectorAll("button[data-copy]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var pre = document.getElementById(b.dataset.copy), text = pre.textContent.trim();
+    var out = document.getElementById(b.getAttribute("aria-describedby"));
+    function done(ok) {
+      b.textContent = ok ? "Copied" : "Copy";
+      out.textContent = ok ? "Copied. Paste it into Terminal." : "Selected. Press Cmd+C or Ctrl+C to copy it.";
+      clearTimeout(b._t); b._t = setTimeout(function () { b.textContent = "Copy"; }, 2000);
+    }
+    function fallback() {
+      var r = document.createRange(), s = window.getSelection(), ok = false;
+      r.selectNodeContents(pre); s.removeAllRanges(); s.addRange(r);
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      done(ok);
+    }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+    else fallback();
+  });
+});
+</script>
+</body>
+</html>
