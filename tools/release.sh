@@ -47,10 +47,14 @@ git -C "$ROOT" add site && git -C "$ROOT" commit -qm "Release $NAME" && git -C "
 
 echo "▸ Deploying $SITE_URL"
 (cd "$ROOT" && wrangler-personal pages deploy site --project-name rytm-mobile --branch main --commit-dirty=true >/dev/null)
-for _ in $(seq 20); do
-  [ "$(curl -fsS "$SITE_URL/version.json" | python3 -c 'import sys,json;print(json.load(sys.stdin)["sha256"])')" = "$SHA" ] && break; sleep 3
+# The CDN can serve version.json and the APK a few seconds apart; wait for both.
+ok=0
+for _ in $(seq 40); do
+  J="$(curl -fsS -H 'Cache-Control: no-cache' "$SITE_URL/version.json" | python3 -c 'import sys,json;print(json.load(sys.stdin)["sha256"])' 2>/dev/null || true)"
+  A="$(curl -fsS -H 'Cache-Control: no-cache' "$SITE_URL/$APK" | shasum -a 256 | cut -d' ' -f1)"
+  [ "$J" = "$SHA" ] && [ "$A" = "$SHA" ] && { ok=1; break; }; sleep 3
 done
-[ "$(curl -fsS "$SITE_URL/$APK" | shasum -a 256 | cut -d' ' -f1)" = "$SHA" ] || { echo "Live APK doesn't match; check the deploy."; exit 1; }
+[ "$ok" = 1 ] || { echo "Live site still doesn't match after 2 minutes; check the deploy. Then run the GitHub step by hand."; exit 1; }
 
 echo "▸ GitHub"
 git -C "$ROOT" push -q origin main "v$NAME"
