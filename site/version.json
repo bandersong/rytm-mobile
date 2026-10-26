@@ -1,7 +1,7 @@
 {
- "versionCode": 6,
- "versionName": "1.2.0",
- "apk": "RytmMobile-1.2.0.apk",
- "sha256": "4b1223659e6e0549e9ba87a6aeab296ed0574441e7cf1e4ddc92f824b8c93e9d",
- "notes": "Updates itself: when a new version is out, tap Update. Also reconnects to the Rytm after an unplug, and keeps your sample when you rotate or fold the phone."
+ "versionCode": 7,
+ "versionName": "1.3.0",
+ "apk": "RytmMobile-1.3.0.apk",
+ "sha256": "59294a9bac7054fe3e4d6ab39c72a510d1d0b0547014a6a8c0ea9acbd105939c",
+ "notes": "Save your stems to the phone (full-quality FLAC or Rytm-ready WAV), share them, or zip a whole split. Split history lets you reopen or delete past splits. Save chops to the phone too. Update your computer's server by running the install command again."
 }
