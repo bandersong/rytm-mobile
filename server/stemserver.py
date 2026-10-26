@@ -1,15 +1,19 @@
 """Stem server for the Rytm Mobile Android app.
 
 POST /jobs (multipart: file, model)      -> {"id": ...}
+GET  /jobs                               -> every job on this server, newest first
 GET  /jobs/{id}                          -> status, stems
 GET  /jobs/{id}/stems/{name}             -> 48 kHz mono 16-bit WAV (Rytm-ready)
+GET  /jobs/{id}/stems/{name}?format=flac -> full-quality stereo FLAC at the separator's rate
+GET  /jobs/{id}/zip?format=wav|flac      -> every stem of the job in one zip
 GET  /models                             -> the models offered
 Auth: header X-Token must match env STEM_TOKEN. The server refuses to start without one.
 """
-import os, uuid, threading, queue, subprocess, shutil, glob, re, traceback, hmac, json
+import os, uuid, threading, queue, subprocess, shutil, glob, re, traceback, hmac, json, time, tempfile, zipfile
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Query
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 ROOT = Path(os.environ.get("STEM_DIR", Path.home() / "rytm-mobile" / "jobs"))
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -185,6 +189,12 @@ def to_rytm(src, dst):
                     "-sample_fmt", "s16", str(dst)], check=True)
 
 
+def to_flac(src, dst):
+    # Full-quality copy: stereo, the separator's own sample rate, lossless.
+    subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(src), "-vn", "-ac", "2", "-c:a", "flac",
+                    str(dst)], check=True, timeout=600)
+
+
 def worker():
     while True:
         jid = q.get()
@@ -207,7 +217,7 @@ def worker():
             else:
                 run_first = None
                 outs = run_sep(MODELS[mode][0], j["src"], raw)
-            stems = {}
+            stems, flac = {}, {}
             first = len(outs) if mode != "drumkit" else len(run_first)
             for i, p in enumerate(outs):
                 name = stem_label(p)
@@ -218,9 +228,18 @@ def worker():
                 dst = d / f"{name}.wav"
                 to_rytm(p, dst)
                 stems[name] = dst.name
+                # The full-quality copy is a bonus: if it can't be made, the Rytm stem still ships.
+                fdst = d / f"{name}.flac"
+                try:
+                    to_flac(p, fdst)
+                    flac[name] = fdst.name
+                except Exception:
+                    traceback.print_exc()
+                    fdst.unlink(missing_ok=True)
             j["stems"] = stems
+            j["flac"] = flac
             j["status"] = "done"; save(j)
-            # The Rytm-ready stems and the original upload stay; the big intermediates go.
+            # The Rytm stems, the FLAC copies and the original upload stay; the big intermediates go.
             shutil.rmtree(raw, ignore_errors=True)
             wav.unlink(missing_ok=True)
         except Exception as e:
@@ -255,10 +274,32 @@ async def create(file: UploadFile = File(...), model: str = Form("stems"), x_tok
     with open(src, "wb") as f:
         shutil.copyfileobj(file.file, f)
     jobs[jid] = {"id": jid, "model": model, "status": "queued", "src": str(src),
-                 "name": Path(file.filename or "track").stem, "stems": {}}
+                 "name": Path(file.filename or "track").stem, "stems": {}, "created": int(time.time())}
     save(jobs[jid])
     q.put(jid)
     return {"id": jid}
+
+
+def created_at(j):
+    """Unix seconds the job was made; jobs from before "created" was recorded use job.json's date."""
+    c = j.get("created")
+    if isinstance(c, (int, float)):
+        return int(c)
+    try:
+        return int((ROOT / j["id"] / "job.json").stat().st_mtime)
+    except OSError:
+        return 0
+
+
+@app.get("/jobs")
+def list_jobs(x_token: str = Header("")):
+    check(x_token)
+    out = [{"id": j["id"], "name": j.get("name", "track"), "model": j.get("model", ""),
+            "status": j.get("status", ""), "stems": list((j.get("stems") or {}).keys()),
+            "created": created_at(j)}
+           for j in list(jobs.values())]
+    out.sort(key=lambda r: r["created"], reverse=True)
+    return {"jobs": out}
 
 
 @app.get("/jobs/{jid}")
@@ -270,10 +311,89 @@ def status(jid: str, x_token: str = Header("")):
     return {k: v for k, v in j.items() if k != "src"} | {"queue": q.qsize()}
 
 
-@app.get("/jobs/{jid}/stems/{name}")
-def stem(jid: str, name: str, x_token: str = Header("")):
-    check(x_token)
-    j = jobs.get(jid)
-    if not j or name not in j["stems"]:
+OLD_JOB = "no full-quality copy for this older job"
+
+
+def safe_name(s, fallback):
+    """A file name a phone or computer will accept: letters (any language), digits, space, dot, dash, underscore."""
+    s = re.sub(r"[^\w .-]+", "_", str(s or "")).strip(" ._")
+    return s[:80] or fallback
+
+
+def stem_file(jid, j, name, fmt):
+    """The file for one stem, looked up only through job.json's maps (never a name from the URL)."""
+    if fmt == "flac":
+        if "flac" not in j:
+            raise HTTPException(404, OLD_JOB)
+        files = j["flac"]
+    else:
+        files = j.get("stems") or {}
+    if name not in files:
         raise HTTPException(404)
-    return FileResponse(ROOT / jid / j["stems"][name], media_type="audio/wav")
+    d = (ROOT / jid).resolve()
+    p = (d / files[name]).resolve()
+    if p.parent != d or not p.is_file():
+        raise HTTPException(404)
+    return p
+
+
+def get_job(jid):
+    j = jobs.get(jid)
+    if not j:
+        raise HTTPException(404)
+    return j
+
+
+def check_format(fmt):
+    if fmt not in ("wav", "flac"):
+        raise HTTPException(400, "format must be wav or flac")
+
+
+@app.get("/jobs/{jid}/stems/{name}")
+def stem(jid: str, name: str, format: str = Query("wav"), x_token: str = Header("")):
+    check(x_token)
+    check_format(format)
+    j = get_job(jid)
+    if name not in (j.get("stems") or {}):
+        raise HTTPException(404)
+    p = stem_file(jid, j, name, format)
+    if format == "flac":
+        return FileResponse(p, media_type="audio/flac",
+                            filename=f"{safe_name(j.get('name'), 'track')}_{safe_name(name, 'stem')}.flac")
+    return FileResponse(p, media_type="audio/wav")
+
+
+@app.get("/jobs/{jid}/zip")
+def stems_zip(jid: str, format: str = Query("wav"), x_token: str = Header("")):
+    check(x_token)
+    check_format(format)
+    j = get_job(jid)
+    names = list((j.get("stems") or {}).keys())
+    if not names:
+        raise HTTPException(404, "this job has no stems yet")
+    if format == "flac" and "flac" not in j:
+        raise HTTPException(404, OLD_JOB)
+    track = safe_name(j.get("name"), "track")
+    fd, tmp = tempfile.mkstemp(prefix="rytm-stems-", suffix=".zip")
+    os.close(fd)
+    try:
+        used = set()
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+            for name in names:
+                try:
+                    p = stem_file(jid, j, name, format)
+                except HTTPException:
+                    continue  # a stem whose FLAC couldn't be made: the zip carries the rest
+                arc = f"{track}_{safe_name(name, 'stem')}.{format}"
+                n = 2
+                while arc in used:
+                    arc = f"{track}_{safe_name(name, 'stem')}_{n}.{format}"; n += 1
+                used.add(arc)
+                z.write(p, arc)
+        if not used:
+            raise HTTPException(404, "no stem files left for this job")
+    except BaseException:
+        os.unlink(tmp)
+        raise
+    return FileResponse(tmp, media_type="application/zip", filename=f"{track}_stems_{format}.zip",
+                        background=BackgroundTask(os.unlink, tmp))
