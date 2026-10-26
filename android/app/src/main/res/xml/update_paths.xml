@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="updates" path="updates/" />
+    <!-- stems and chops handed to the share sheet -->
+    <cache-path name="share" path="share/" />
 </paths>

@@ -128,17 +128,30 @@ class AppState(private val ctx: Context) {
     var jobId by mutableStateOf(prefs.getString("job", null))
     var job by mutableStateOf<StemClient.Job?>(null)
     var jobName by mutableStateOf(prefs.getString("jobName", "track")!!)
+    /** The track's own name, for folders and files on the phone (jobName is the short Rytm one). */
+    var jobTitle by mutableStateOf(prefs.getString("jobTitle", null) ?: jobName)
+
+    /** What SAVE / SHARE / Save all fetch: full-quality stereo FLAC unless the job only has the WAV. */
+    var quality by mutableStateOf(StemFormat.FLAC)
+    /** The job id the computer has no full-quality copy of (split before FLAC saving existed). */
+    var noFullQuality by mutableStateOf<String?>(null)
+
+    var history by mutableStateOf<List<StemClient.JobInfo>>(emptyList())
+    var historyNote by mutableStateOf<String?>(null)
+    var historyLoading by mutableStateOf(false)
+
+    private fun friendly(e: Exception): String? = when (e) {
+        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException ->
+            "can't reach the computer. Awake? Same Wi-Fi or Tailscale?"
+        else -> e.message
+    }
 
     private fun task(label: String, block: suspend CoroutineScope.() -> Unit) {
         if (busy) return
         busy = true; progress = 0f; status = label
         scope.launch {
             try { withContext(Dispatchers.IO, block) } catch (e: Exception) {
-                status = "Error: " + when (e) {
-                    is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException ->
-                        "can't reach the computer. Awake? Same Wi-Fi or Tailscale?"
-                    else -> e.message
-                }
+                status = "Error: " + friendly(e)
             } finally { busy = false }
         }
     }
@@ -228,6 +241,25 @@ class AppState(private val ctx: Context) {
 
     fun prepared(): Clip? = clip?.let { Audio.prepare(it, start * it.seconds, end * it.seconds, normalize, fades) }
 
+    /** The chop exactly as Send would put it on the Rytm: 48 kHz 16-bit mono WAV. */
+    private fun chopWav(): Pair<String, ByteArray> {
+        val c = prepared() ?: throw Exception("No sample loaded")
+        return (clipName.ifBlank { "sample" } + ".wav") to Audio.wavBytes(Audio.toPcm16(c), c.rate)
+    }
+
+    fun saveChop() = task("Saving chop…") {
+        val (name, bytes) = chopWav()
+        val uri = Saver.saveAudio(ctx, bytes, "Chops", name, StemFormat.WAV.mime)
+        status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.MUSIC_DIR}/Chops"
+    }
+
+    fun shareChop() = task("Getting the chop ready to share…") {
+        val (name, bytes) = chopWav()
+        val f = Saver.shareCopy(ctx, name).apply { writeBytes(bytes) }
+        withContext(Dispatchers.Main) { Saver.share(ctx, f, StemFormat.WAV.mime, "Share $name") }
+        status = "Sharing $name"
+    }
+
     fun send() = task("Sending to Rytm…") {
         if (link == null) throw Exception("Connect the Rytm first")
         val c = prepared() ?: throw Exception("No sample loaded")
@@ -268,10 +300,13 @@ class AppState(private val ctx: Context) {
 
     fun separate(uri: Uri) = task("Uploading track…") {
         val c = client()
-        jobName = clean(StemClient.displayName(ctx, uri).substringBeforeLast('.')).take(12)
+        val title = StemClient.displayName(ctx, uri).substringBeforeLast('.')
+        jobName = clean(title).take(12); jobTitle = StemClient.fileSafe(title)
         val id = c.submit(ctx, uri, model) { progress = it }
-        jobId = id; prefs.edit().putString("job", id).putString("jobName", jobName).apply()
+        jobId = id; noFullQuality = null; quality = StemFormat.FLAC
+        prefs.edit().putString("job", id).putString("jobName", jobName).putString("jobTitle", jobTitle).apply()
         poll(c, id)
+        loadHistory()
     }
 
     fun resume() = task("Checking job…") {
@@ -290,6 +325,98 @@ class AppState(private val ctx: Context) {
             delay(2000)
         }
         if (job?.status == "done") status = "Stems ready: ${job!!.stems.joinToString()}"
+    }
+
+    /** GET /jobs for the History panel. Runs beside other work: it never takes the busy lock. */
+    fun loadHistory() {
+        if (server.isBlank() || historyLoading) return
+        historyLoading = true
+        scope.launch {
+            try {
+                val l = withContext(Dispatchers.IO) { client().jobs() }
+                history = l; historyNote = if (l.isEmpty()) "Nothing split on this computer yet." else null
+            } catch (e: Exception) {
+                historyNote = friendly(e)
+            } finally { historyLoading = false }
+        }
+    }
+
+    /** Makes a past split the current job, so it can be played, chopped, saved and sent again. */
+    fun openJob(j: StemClient.JobInfo) {
+        if (busy) return
+        jobId = j.id; jobName = clean(j.name).take(12); jobTitle = StemClient.fileSafe(j.name)
+        job = StemClient.Job(j.status, j.stems, null, 0)
+        noFullQuality = null; quality = StemFormat.FLAC
+        prefs.edit().putString("job", j.id).putString("jobName", jobName).putString("jobTitle", jobTitle).apply()
+        when (j.status) {
+            "done" -> status = "Opened ${j.name}: ${j.stems.size} stems"
+            "error" -> status = "Error: that split failed on the computer. Split the track again."
+            else -> resume()
+        }
+    }
+
+    /** The computer has no FLAC for this job: switch to the WAV and say so (not an error, nothing was lost). */
+    private fun offerWav(e: NoFullQualityException) {
+        if (e.wholeJob) noFullQuality = jobId
+        quality = StemFormat.WAV
+        // Short: the status line shows two lines; the Save panel carries the longer explanation.
+        status = (if (e.wholeJob) "No full-quality copy of this older job." else e.message) +
+            " Switched to Rytm-ready: tap again for the 48k WAV."
+    }
+
+    private fun tmp(name: String) = File(ctx.cacheDir, "dl").apply { mkdirs() }.let { File(it, name) }
+
+    /** SAVE on one stem: Music/Rytm Mobile/<track>/<track>_<stem>.<ext>. */
+    fun saveStem(stem: String) = task("Saving $stem…") {
+        val id = jobId ?: throw Exception("No job open")
+        val fmt = quality
+        val name = StemClient.stemFileName(jobTitle, stem, fmt)
+        val f = try { client().download(id, stem, tmp(name), fmt) { progress = it } }
+            catch (e: NoFullQualityException) { offerWav(e); return@task }
+        try {
+            val uri = Saver.saveAudio(ctx, f, jobTitle, name, fmt.mime, replace = true)
+            status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.MUSIC_DIR}/$jobTitle"
+        } finally { f.delete() }
+    }
+
+    /** SHARE on one stem: the share sheet, with a cache copy only we and the chosen app can read. */
+    fun shareStem(stem: String) = task("Getting $stem ready to share…") {
+        val id = jobId ?: throw Exception("No job open")
+        val fmt = quality
+        val f = Saver.shareCopy(ctx, StemClient.stemFileName(jobTitle, stem, fmt))
+        try { client().download(id, stem, f, fmt) { progress = it } }
+        catch (e: NoFullQualityException) { f.delete(); offerWav(e); return@task }
+        withContext(Dispatchers.Main) { Saver.share(ctx, f, fmt.mime, "Share $stem") }
+        status = "Sharing ${f.name}"
+    }
+
+    /** Save all: every stem into Music/Rytm Mobile/<track>/. */
+    fun saveAllStemFiles() = task("Saving all stems…") {
+        val id = jobId ?: throw Exception("No job open")
+        val stems = job?.stems ?: emptyList()
+        val fmt = quality; val c = client()
+        stems.forEachIndexed { i, s ->
+            status = "Saving ${i + 1}/${stems.size}: $s"
+            val name = StemClient.stemFileName(jobTitle, s, fmt)
+            val f = try { c.download(id, s, tmp(name), fmt) { p -> progress = (i + p) / stems.size } }
+                catch (e: NoFullQualityException) { offerWav(e); return@task }
+            try { Saver.saveAudio(ctx, f, jobTitle, name, fmt.mime, replace = true) } finally { f.delete() }
+        }
+        progress = 1f
+        status = "Saved ${stems.size} stems to ${Saver.MUSIC_DIR}/$jobTitle (${if (fmt == StemFormat.FLAC) "full-quality FLAC" else "48k WAV"})"
+    }
+
+    /** One zip of every stem into Download/Rytm Mobile/. */
+    fun saveZip() = task("Zipping stems on the computer…") {
+        val id = jobId ?: throw Exception("No job open")
+        val fmt = quality
+        val name = StemClient.zipFileName(jobTitle, fmt)
+        val f = try { client().zip(id, fmt, tmp(name)) { progress = it } }
+            catch (e: NoFullQualityException) { offerWav(e); return@task }
+        try {
+            val uri = Saver.saveDownload(ctx, f, name, "application/zip", replace = true)
+            status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.DOWNLOAD_DIR}"
+        } finally { f.delete() }
     }
 
     fun openStem(stem: String, then: () -> Unit = {}) = task("Downloading $stem…") {

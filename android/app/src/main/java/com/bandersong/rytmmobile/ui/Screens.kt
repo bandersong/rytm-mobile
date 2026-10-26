@@ -271,6 +271,13 @@ private fun ChopScreen(vm: AppState) = Page {
             GhostButton("Stop", { Audio.stop() })
         }
     }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        HardButton("Save", { vm.saveChop() }, small = true, color = P.Audio, enabled = !vm.busy)
+        Spacer(Modifier.width(4.dp))
+        GhostButton("Share", { vm.shareChop() }, color = P.Audio, enabled = !vm.busy)
+        Spacer(Modifier.width(12.dp))
+        Text("48k WAV to Music/Rytm Mobile/Chops", style = T.Small, modifier = Modifier.weight(1f), maxLines = 2)
+    }
     if (vm.link == null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Patch the Rytm in to send.", style = T.Small, modifier = Modifier.weight(1f))
@@ -358,6 +365,8 @@ private fun Wave(c: Clip, start: Float, end: Float, onChange: (Float, Float) -> 
 /* ───────────────────────────── SPLIT ───────────────────────────── */
 
 private val MODE_LABEL = mapOf("stems" to "6 stems", "demucs" to "4 stems · fast", "vocals" to "Vocals", "drumkit" to "Drum kit")
+/** History lines already say how many stems came out, so the mode is named without a count. */
+private val HISTORY_MODE = mapOf("stems" to "Full band", "demucs" to "Fast", "vocals" to "Vocals", "drumkit" to "Drum kit")
 private fun stemColor(s: String) = when {
     s.startsWith("drum") || s in setOf("kick", "snare", "toms", "hh", "ride", "crash") -> P.Signal
     s == "bass" -> P.Cv
@@ -371,7 +380,7 @@ private fun SplitScreen(vm: AppState) = Page {
     var editServer by remember { mutableStateOf(vm.models.isEmpty()) }
     val online = vm.models.isNotEmpty()
     // a pairing link (or Connect) that succeeds folds the address fields away
-    LaunchedEffect(online) { if (online) editServer = false }
+    LaunchedEffect(online) { if (online) { editServer = false; vm.loadHistory() } }
     Panel("Mac", if (online) "online · BS‑RoFormer" else "stem server", accent = P.Audio,
         trailing = { Led(online, Color(0xFF7FD48A)) }) {
         if (editServer || !online) {
@@ -417,20 +426,95 @@ private fun SplitScreen(vm: AppState) = Page {
     if (j != null && j.status != "done" && j.status != "error") SignalPath(j.status)
     if (j == null) Print(R.drawable.empty_stems)
     if (j?.status == "done") {
-        Panel(vm.jobName, "${j.stems.size} stems · 48k mono", accent = P.Audio) {
-            j.stems.forEach { s ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Jack(stemColor(s), true, 20.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(s.replace('_', ' ').uppercase(), style = T.Title.copy(fontSize = 19.sp), modifier = Modifier.weight(1f))
-                    GhostButton("Play", { vm.openStem(s) { vm.clip?.let(Audio::play) } }, enabled = !vm.busy)
-                    Spacer(Modifier.width(6.dp))
-                    GhostButton("Chop", { vm.openStem(s) { vm.tab = 1 } }, color = P.Cv, enabled = !vm.busy)
+        Panel(vm.jobTitle, "${j.stems.size} stems", accent = P.Audio) {
+            j.stems.forEachIndexed { i, s ->
+                if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(P.Line.copy(alpha = .5f)))
+                Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Jack(stemColor(s), true, 20.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(s.replace('_', ' ').uppercase(), style = T.Title.copy(fontSize = 19.sp), modifier = Modifier.weight(1f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        GhostButton("Play", { vm.openStem(s) { vm.clip?.let(Audio::play) } }, enabled = !vm.busy)
+                        Spacer(Modifier.width(6.dp))
+                        GhostButton("Chop", { vm.openStem(s) { vm.tab = 1 } }, color = P.Cv, enabled = !vm.busy)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        GhostButton("Save", { vm.saveStem(s) }, color = P.Audio, enabled = !vm.busy)
+                        Spacer(Modifier.width(6.dp))
+                        GhostButton("Share", { vm.shareStem(s) }, color = P.Audio, enabled = !vm.busy)
+                    }
                 }
             }
         }
+        SavePanel(vm, j)
         if (vm.link != null) HardButton("Send all → ${AppState.join(vm.dir, vm.jobName)}", { vm.sendAllStems() }, color = P.Signal, enabled = !vm.busy)
         else GhostButton("Patch the Rytm in to send all", { vm.tab = 0 }, color = P.Signal)
+    }
+    HistoryPanel(vm)
+}
+
+/** Quality for SAVE / SHARE / Save all, and the Save all + zip buttons. */
+@Composable
+private fun SavePanel(vm: AppState, j: StemClient.Job) {
+    val flacGone = vm.noFullQuality != null && vm.noFullQuality == vm.jobId
+    Panel("Save to phone", null, accent = P.Audio) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Switch("Full quality", vm.quality == StemFormat.FLAC, { if (!flacGone) vm.quality = StemFormat.FLAC })
+            Switch("Rytm-ready", vm.quality == StemFormat.WAV, { vm.quality = StemFormat.WAV })
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            when {
+                flacGone -> "This job was split before full-quality saving existed, so only the Rytm-ready WAV is on the computer. Split the track again for FLAC."
+                vm.quality == StemFormat.FLAC -> "Stereo FLAC at 44.1 kHz, exactly as the computer split it. Best for a DAW."
+                else -> "48 kHz mono WAV, the same file Send puts on the Rytm."
+            }, style = T.Small,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HardButton("Save all ${j.stems.size}", { vm.saveAllStemFiles() }, small = true, color = P.Audio, enabled = !vm.busy && j.stems.isNotEmpty())
+            Spacer(Modifier.width(4.dp))
+            GhostButton("Zip", { vm.saveZip() }, color = P.Audio, enabled = !vm.busy)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Stems go to Music/Rytm Mobile/${vm.jobTitle}. Zips go to Download/Rytm Mobile.", style = T.Label)
+    }
+}
+
+/** Every split on the computer, newest first; tap one to make it the current job. */
+@Composable
+private fun HistoryPanel(vm: AppState) {
+    var all by remember { mutableStateOf(false) }
+    val list = vm.history
+    Panel("History", if (list.isEmpty()) null else "${list.size} splits", accent = P.Audio,
+        trailing = { GhostButton(if (vm.historyLoading) "…" else "Refresh", { vm.loadHistory() }, enabled = !vm.historyLoading) }) {
+        vm.historyNote?.let { Text(it, style = T.Small) }
+        if (list.isEmpty() && vm.historyNote == null) Text(if (vm.historyLoading) "Asking the computer…" else "Tap refresh to list past splits.", style = T.Small)
+        (if (all) list else list.take(6)).forEach { h ->
+            val current = h.id == vm.jobId
+            Row(
+                Modifier.fillMaxWidth().clickable(enabled = !vm.busy) { vm.openJob(h) }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Jack(if (h.status == "error") P.Signal else P.Audio, current, 18.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(h.name, style = T.Title.copy(fontSize = 17.sp, color = if (current) P.Ink else P.Muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val what = when (h.status) {
+                        "done" -> "${h.stems.size} stems"
+                        "error" -> "failed"
+                        "running" -> "splitting now"
+                        else -> h.status
+                    }
+                    Text(listOf(HISTORY_MODE[h.model] ?: h.model, what, StemClient.ago(h.created)).filter { it.isNotBlank() }.joinToString(" · "),
+                        style = T.Small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text("›", style = T.Title.copy(color = P.Audio))
+            }
+        }
+        if (list.size > 6) GhostButton(if (all) "Show fewer" else "Show all ${list.size}", { all = !all }, color = P.Audio)
     }
 }
 

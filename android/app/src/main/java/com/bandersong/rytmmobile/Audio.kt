@@ -175,6 +175,23 @@ object Audio {
         }
     }
 
+    /** A plain PCM WAV file (RIFF, little-endian, 16-bit): 44-byte header, then the samples. */
+    fun wavBytes(pcm: ShortArray, rate: Int = Elektron.SAMPLE_RATE, channels: Int = 1): ByteArray {
+        val dataLen = pcm.size * 2
+        val b = java.nio.ByteBuffer.allocate(44 + dataLen).order(ByteOrder.LITTLE_ENDIAN)
+        b.put("RIFF".toByteArray(Charsets.US_ASCII)).putInt(36 + dataLen).put("WAVE".toByteArray(Charsets.US_ASCII))
+        b.put("fmt ".toByteArray(Charsets.US_ASCII)).putInt(16)
+            .putShort(1)                                  // PCM
+            .putShort(channels.toShort())
+            .putInt(rate)
+            .putInt(rate * channels * 2)                  // byte rate
+            .putShort((channels * 2).toShort())           // block align
+            .putShort(16)                                 // bits per sample
+        b.put("data".toByteArray(Charsets.US_ASCII)).putInt(dataLen)
+        for (s in pcm) b.putShort(s)
+        return b.array()
+    }
+
     private var track: AudioTrack? = null
     fun play(c: Clip) {
         stop()
