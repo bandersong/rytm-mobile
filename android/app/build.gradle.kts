@@ -12,8 +12,8 @@ android {
         applicationId = "com.bandersong.rytmmobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.2.0"
+        versionCode = 7
+        versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_URL", "\"https://rytm-mobile.pages.dev/version.json\"")
     }
