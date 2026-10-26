@@ -361,7 +361,7 @@ class AppState(private val ctx: Context) {
         quality = StemFormat.WAV
         // Short: the status line shows two lines; the Save panel carries the longer explanation.
         status = (if (e.wholeJob) "No full-quality copy of this older job." else e.message) +
-            " Switched to Rytm-ready: tap again for the 48k WAV."
+            " Tap again for the 48k WAV."
     }
 
     private fun tmp(name: String) = File(ctx.cacheDir, "dl").apply { mkdirs() }.let { File(it, name) }

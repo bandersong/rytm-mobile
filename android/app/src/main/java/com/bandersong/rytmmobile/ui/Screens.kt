@@ -490,7 +490,7 @@ private fun SavePanel(vm: AppState, j: StemClient.Job) {
 private fun HistoryPanel(vm: AppState) {
     var all by remember { mutableStateOf(false) }
     val list = vm.history
-    Panel("History", if (list.isEmpty()) null else "${list.size} splits", accent = P.Audio,
+    Panel("History", if (list.isEmpty()) null else "${list.size} split${if (list.size == 1) "" else "s"}", accent = P.Audio,
         trailing = { GhostButton(if (vm.historyLoading) "…" else "Refresh", { vm.loadHistory() }, enabled = !vm.historyLoading) }) {
         vm.historyNote?.let { Text(it, style = T.Small) }
         if (list.isEmpty() && vm.historyNote == null) Text(if (vm.historyLoading) "Asking the computer…" else "Tap refresh to list past splits.", style = T.Small)
