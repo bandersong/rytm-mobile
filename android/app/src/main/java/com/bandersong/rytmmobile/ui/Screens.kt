@@ -381,6 +381,8 @@ private fun SplitScreen(vm: AppState) = Page {
     val online = vm.models.isNotEmpty()
     // a pairing link (or Connect) that succeeds folds the address fields away
     LaunchedEffect(online) { if (online) { editServer = false; vm.loadHistory() } }
+    // Already paired: reconnect on its own after a restart, so History and the last split show without a Connect tap.
+    LaunchedEffect(Unit) { if (!online && vm.server.isNotBlank() && vm.token.isNotBlank()) vm.fetchModels() }
     Panel("Mac", if (online) "online · BS‑RoFormer" else "stem server", accent = P.Audio,
         trailing = { Led(online, Color(0xFF7FD48A)) }) {
         if (editServer || !online) {
