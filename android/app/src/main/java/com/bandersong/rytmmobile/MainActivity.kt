@@ -286,8 +286,22 @@ class AppState(private val ctx: Context) {
         fetchModels()
     }
 
+    /** The server|token pair the app last tried to connect with (by Connect, a pairing link or auto-connect). */
+    private var triedKey: String? = null
+
+    /**
+     * SPLIT calls this whenever it opens. It reconnects to the saved server once per app session (and again only if
+     * the address or token changed since), and never while another task holds the busy lock.
+     */
+    fun autoConnect() {
+        if (busy || models.isNotEmpty() || server.isBlank() || token.isBlank()) return
+        if (triedKey == "$server|$token") return
+        fetchModels()
+    }
+
     /** Checks the server and token; they are saved only once the server has answered with them. */
     fun fetchModels() = task("Contacting stem server…") {
+        triedKey = "$server|$token"
         if (server.isBlank()) throw Exception("Pair with your computer first: run the installer there and scan its code.")
         val url = serverUrl(server) ?: throw Exception(BAD_SERVER)
         val tok = token
