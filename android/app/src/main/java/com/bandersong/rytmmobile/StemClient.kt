@@ -39,6 +39,8 @@ class StemClient(private val base: String, private val token: String) {
         if (code !in 200..299) throw IOException(when (code) {
             401 -> "Wrong token. Run ~/.rytm-stems/pair, scan again."
             404 -> "That job isn't on the Mac any more. Split the track again."
+            // 507: the computer's disk is nearly full; its detail says how much is free.
+            507 -> detail(c).ifBlank { "The computer is almost out of disk space." }
             else -> "Mac server error $code: " + detail(c)
         })
         return JSONObject(c.inputStream.bufferedReader().readText())
@@ -89,15 +91,37 @@ class StemClient(private val base: String, private val token: String) {
         return parseJobs(json(c).toString())
     }
 
+    /**
+     * Removes a split from the computer (its stems, FLAC copies and upload). Copies already saved on the
+     * phone are untouched. A job the computer no longer has counts as deleted.
+     */
+    fun delete(id: String) {
+        val c = conn("/jobs/" + URLEncoder.encode(id, "UTF-8"))
+        c.requestMethod = "DELETE"
+        when (val code = c.responseCode) {
+            in 200..299, 404 -> Unit
+            401 -> throw IOException("Wrong token. Run ~/.rytm-stems/pair, scan again.")
+            405 -> throw IOException("Update the stem server on your computer to delete splits.")
+            409 -> throw IOException(detail(c).ifBlank { "That split is still running. Delete it when it has finished." })
+            else -> throw IOException("Mac server error $code: " + detail(c))
+        }
+    }
+
     /** A stem as Rytm-ready WAV (the default) or full-quality FLAC. */
     fun download(id: String, stem: String, dst: File, format: StemFormat = StemFormat.WAV, progress: (Float) -> Unit = {}): File {
         val q = if (format == StemFormat.WAV) "" else "?format=${format.query}"
         return fetch(conn("/jobs/$id/stems/" + URLEncoder.encode(stem, "UTF-8").replace("+", "%20") + q), dst, format, "stem $stem", progress)
     }
 
+    /** The zip, and the stems the computer left out of it (X-Stems-Missing), if any. */
+    class ZipResult(val file: File, val missing: List<String>)
+
     /** All stems of a job in one zip, named "<track>_<stem>.<ext>". */
-    fun zip(id: String, format: StemFormat, dst: File, progress: (Float) -> Unit = {}): File =
-        fetch(conn("/jobs/$id/zip?format=${format.query}"), dst, format, "zip", progress, zip = true)
+    fun zip(id: String, format: StemFormat, dst: File, progress: (Float) -> Unit = {}): ZipResult {
+        val c = conn("/jobs/$id/zip?format=${format.query}")
+        val f = fetch(c, dst, format, "zip", progress, zip = true)
+        return ZipResult(f, parseMissing(c.getHeaderField("X-Stems-Missing")))
+    }
 
     private fun fetch(c: HttpURLConnection, dst: File, format: StemFormat, what: String, progress: (Float) -> Unit, zip: Boolean = false): File {
         val code = c.responseCode
@@ -170,6 +194,41 @@ class StemClient(private val base: String, private val token: String) {
 
         fun zipFileName(track: String, format: StemFormat) =
             "${fileSafe(track)}_stems_${if (format == StemFormat.FLAC) "full" else "rytm"}.zip"
+
+        /** How a split mode is named in a folder: "Full band", "Fast", "Vocals", "Drum kit". */
+        fun modeLabel(model: String?): String? = when (model) {
+            "stems" -> "Full band"; "demucs" -> "Fast"; "vocals" -> "Vocals"; "drumkit" -> "Drum kit"
+            else -> null
+        }
+
+        /**
+         * The phone folder (and zip name stem) for one split: "<track> (<mode>)". Two splits of the same
+         * song in different modes don't overwrite each other; saving the SAME split again still replaces.
+         * A split whose mode isn't known (opened before the app recorded it) uses the job id's first 6 characters.
+         */
+        fun saveFolder(title: String, model: String?, jobId: String?): String {
+            val tag = modeLabel(model) ?: jobId?.take(6)?.takeIf { it.isNotBlank() }
+            return if (tag == null) fileSafe(title) else "${fileSafe(title)} ($tag)"
+        }
+
+        /** X-Stems-Missing: "vocals,drums_full" → names; null or blank → none. */
+        fun parseMissing(h: String?): List<String> = h?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+
+        /** "Saved 6 stems to <folder> (full-quality FLAC)", or says which ones came out as WAV. */
+        fun saveAllSummary(total: Int, folder: String, fmt: StemFormat, wavStems: List<String>): String = when {
+            wavStems.isEmpty() ->
+                "Saved $total stems to ${Saver.MUSIC_DIR}/$folder (${if (fmt == StemFormat.FLAC) "full-quality FLAC" else "48k WAV"})"
+            wavStems.size == total ->
+                "Saved $total stems to ${Saver.MUSIC_DIR}/$folder as 48k WAV (the computer has no full-quality copy)"
+            else ->
+                "Saved $total stems to ${Saver.MUSIC_DIR}/$folder. ${total - wavStems.size} FLAC; no full-quality copy of " +
+                    "${wavStems.joinToString(", ")}, so ${if (wavStems.size == 1) "that one is a" else "those are"} 48k WAV."
+        }
+
+        /** "Saved X to Download/Rytm Mobile." plus how many stems are in the zip when some were left out. */
+        fun zipNote(total: Int, missing: List<String>): String =
+            if (missing.isEmpty() || total <= 0) ""
+            else " ${(total - missing.size).coerceAtLeast(0)} of $total stems in the zip; no full-quality copy of ${missing.joinToString(", ")}."
 
         /** Phone file and folder names: keep spaces and accents, drop what file systems refuse. */
         fun fileSafe(s: String): String =

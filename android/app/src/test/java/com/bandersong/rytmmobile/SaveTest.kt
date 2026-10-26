@@ -86,4 +86,31 @@ class SaveTest {
         assertEquals("", StemClient.ago(0, now))
         assertTrue(StemClient.ago(now - 30 * 86400, now).matches(Regex("\\d{1,2} [A-Z][a-z]{2}")))
     }
+
+    @Test fun differentSplitsOfOneSongGetDifferentFolders() {
+        assertEquals("bombs (Full band)", StemClient.saveFolder("bombs", "stems", "a1b2c3d4e5f6"))
+        assertEquals("bombs (Vocals)", StemClient.saveFolder("bombs", "vocals", "zzz"))
+        // same job saved again -> same folder (replaces); a mode the app doesn't know yet falls back to the job id
+        assertEquals(StemClient.saveFolder("bombs", "stems", "a1b2c3d4e5f6"), StemClient.saveFolder("bombs", "stems", "a1b2c3d4e5f6"))
+        assertEquals("bombs (a1b2c3)", StemClient.saveFolder("bombs", null, "a1b2c3d4e5f6"))
+        assertEquals("AC_DC (Drum kit)", StemClient.saveFolder("AC/DC", "drumkit", null))
+        assertEquals("bombs", StemClient.saveFolder("bombs", null, null))
+        assertEquals("bombs (Fast)_stems_full.zip", StemClient.zipFileName(StemClient.saveFolder("bombs", "demucs", "x"), StemFormat.FLAC))
+    }
+
+    @Test fun missingStemsHeader() {
+        assertEquals(listOf("vocals", "drums_full"), StemClient.parseMissing("vocals, drums_full"))
+        assertTrue(StemClient.parseMissing(null).isEmpty())
+        assertTrue(StemClient.parseMissing("").isEmpty())
+        assertEquals(" 5 of 6 stems in the zip; no full-quality copy of vocals.", StemClient.zipNote(6, listOf("vocals")))
+        assertEquals("", StemClient.zipNote(6, emptyList()))
+    }
+
+    @Test fun saveAllSaysWhichStemsCameOutAsWav() {
+        assertEquals("Saved 6 stems to Music/Rytm Mobile/b (Full band) (full-quality FLAC)",
+            StemClient.saveAllSummary(6, "b (Full band)", StemFormat.FLAC, emptyList()))
+        val mixed = StemClient.saveAllSummary(6, "b", StemFormat.FLAC, listOf("vocals", "bass"))
+        assertTrue(mixed, mixed.contains("4 FLAC") && mixed.contains("vocals, bass") && mixed.contains("those are 48k WAV"))
+        assertTrue(StemClient.saveAllSummary(4, "b", StemFormat.FLAC, List(4) { "s$it" }).contains("as 48k WAV"))
+    }
 }

@@ -481,7 +481,9 @@ private fun SavePanel(vm: AppState, j: StemClient.Job) {
             GhostButton("Zip", { vm.saveZip() }, color = P.Audio, enabled = !vm.busy)
         }
         Spacer(Modifier.height(8.dp))
-        Text("Stems go to Music/Rytm Mobile/${vm.jobTitle}. Zips go to Download/Rytm Mobile.", style = T.Label)
+        vm.saveNote?.let { Text(it.trim(), style = T.Small) }
+        Spacer(Modifier.height(8.dp))
+        Text("Stems go to Music/Rytm Mobile/${vm.saveFolder}. Zips go to Download/Rytm Mobile.", style = T.Label)
     }
 }
 
@@ -489,7 +491,20 @@ private fun SavePanel(vm: AppState, j: StemClient.Job) {
 @Composable
 private fun HistoryPanel(vm: AppState) {
     var all by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf<StemClient.JobInfo?>(null) }
     val list = vm.history
+    confirm?.let { h ->
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(h.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            text = { Text("Delete this split from your computer? Saved copies on the phone stay.") },
+            confirmButton = { GhostButton("Delete", { confirm = null; vm.deleteJob(h) }, color = P.Signal) },
+            dismissButton = { GhostButton("Cancel", { confirm = null }) },
+            containerColor = P.Panel,
+            titleContentColor = P.Ink,
+            textContentColor = P.Muted,
+        )
+    }
     Panel("History", if (list.isEmpty()) null else "${list.size} split${if (list.size == 1) "" else "s"}", accent = P.Audio,
         trailing = { GhostButton(if (vm.historyLoading) "…" else "Refresh", { vm.loadHistory() }, enabled = !vm.historyLoading) }) {
         vm.historyNote?.let { Text(it, style = T.Small) }
@@ -513,7 +528,10 @@ private fun HistoryPanel(vm: AppState) {
                     Text(listOf(HISTORY_MODE[h.model] ?: h.model, what, StemClient.ago(h.created)).filter { it.isNotBlank() }.joinToString(" · "),
                         style = T.Small, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text("›", style = T.Title.copy(color = P.Audio))
+                Spacer(Modifier.width(8.dp))
+                // A split that is still queued or running can't be deleted; the computer would refuse it too.
+                GhostButton("Delete", { confirm = h }, color = P.Signal,
+                    enabled = !vm.busy && h.status != "queued" && h.status != "running")
             }
         }
         if (list.size > 6) GhostButton(if (all) "Show fewer" else "Show all ${list.size}", { all = !all }, color = P.Audio)

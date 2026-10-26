@@ -130,11 +130,17 @@ class AppState(private val ctx: Context) {
     var jobName by mutableStateOf(prefs.getString("jobName", "track")!!)
     /** The track's own name, for folders and files on the phone (jobName is the short Rytm one). */
     var jobTitle by mutableStateOf(prefs.getString("jobTitle", null) ?: jobName)
+    /** The mode the open job was split with ("stems", "vocals"…); null for a job opened before this was recorded. */
+    var jobModel by mutableStateOf(prefs.getString("jobModel", null))
+    /** Where this job's stems are saved on the phone: Music/Rytm Mobile/<this>/. One folder per split. */
+    val saveFolder get() = StemClient.saveFolder(jobTitle, jobModel, jobId)
 
     /** What SAVE / SHARE / Save all fetch: full-quality stereo FLAC unless the job only has the WAV. */
     var quality by mutableStateOf(StemFormat.FLAC)
     /** The job id the computer has no full-quality copy of (split before FLAC saving existed). */
     var noFullQuality by mutableStateOf<String?>(null)
+    /** What the last Save all / Zip did about stems with no FLAC (the status line is too short to name them). */
+    var saveNote by mutableStateOf<String?>(null)
 
     var history by mutableStateOf<List<StemClient.JobInfo>>(emptyList())
     var historyNote by mutableStateOf<String?>(null)
@@ -317,8 +323,8 @@ class AppState(private val ctx: Context) {
         val title = StemClient.displayName(ctx, uri).substringBeforeLast('.')
         jobName = clean(title).take(12); jobTitle = StemClient.fileSafe(title)
         val id = c.submit(ctx, uri, model) { progress = it }
-        jobId = id; noFullQuality = null; quality = StemFormat.FLAC
-        prefs.edit().putString("job", id).putString("jobName", jobName).putString("jobTitle", jobTitle).apply()
+        jobId = id; jobModel = model; noFullQuality = null; saveNote = null; quality = StemFormat.FLAC
+        prefs.edit().putString("job", id).putString("jobName", jobName).putString("jobTitle", jobTitle).putString("jobModel", model).apply()
         poll(c, id)
         loadHistory()
     }
@@ -355,13 +361,27 @@ class AppState(private val ctx: Context) {
         }
     }
 
+    /** Removes a split from the computer. Saved copies on the phone stay. */
+    fun deleteJob(j: StemClient.JobInfo) = task("Deleting ${j.name} from the computer…") {
+        client().delete(j.id)
+        history = history.filter { it.id != j.id }
+        if (history.isEmpty()) historyNote = "Nothing split on this computer yet."
+        if (jobId == j.id) {
+            jobId = null; job = null; noFullQuality = null; saveNote = null
+            prefs.edit().remove("job").remove("jobModel").apply()
+            jobModel = null
+        }
+        status = "Deleted ${j.name} from the computer. Saved copies on the phone stay."
+    }
+
     /** Makes a past split the current job, so it can be played, chopped, saved and sent again. */
     fun openJob(j: StemClient.JobInfo) {
         if (busy) return
         jobId = j.id; jobName = clean(j.name).take(12); jobTitle = StemClient.fileSafe(j.name)
+        jobModel = j.model.ifBlank { null }; saveNote = null
         job = StemClient.Job(j.status, j.stems, null, 0)
         noFullQuality = null; quality = StemFormat.FLAC
-        prefs.edit().putString("job", j.id).putString("jobName", jobName).putString("jobTitle", jobTitle).apply()
+        prefs.edit().putString("job", j.id).putString("jobName", jobName).putString("jobTitle", jobTitle).putString("jobModel", jobModel).apply()
         when (j.status) {
             "done" -> status = "Opened ${j.name}: ${j.stems.size} stems"
             "error" -> status = "Error: that split failed on the computer. Split the track again."
@@ -378,19 +398,28 @@ class AppState(private val ctx: Context) {
             " Tap again for the 48k WAV."
     }
 
-    private fun tmp(name: String) = File(ctx.cacheDir, "dl").apply { mkdirs() }.let { File(it, name) }
+    /** A scratch file in cacheDir/dl. Leftovers of a crashed or killed save (over an hour old) are swept first. */
+    private fun tmp(name: String): File {
+        val d = File(ctx.cacheDir, "dl").apply { mkdirs() }
+        val old = System.currentTimeMillis() - 3600_000L
+        d.listFiles()?.forEach { if (it.lastModified() < old) it.delete() }
+        return File(d, name)
+    }
 
-    /** SAVE on one stem: Music/Rytm Mobile/<track>/<track>_<stem>.<ext>. */
+    /** SAVE on one stem: Music/Rytm Mobile/<track> (<mode>)/<track>_<stem>.<ext>. */
     fun saveStem(stem: String) = task("Saving $stem…") {
+        saveNote = null
         val id = jobId ?: throw Exception("No job open")
         val fmt = quality
         val name = StemClient.stemFileName(jobTitle, stem, fmt)
-        val f = try { client().download(id, stem, tmp(name), fmt) { progress = it } }
-            catch (e: NoFullQualityException) { offerWav(e); return@task }
+        val folder = saveFolder
+        val f = tmp(name)
         try {
-            val uri = Saver.saveAudio(ctx, f, jobTitle, name, fmt.mime, replace = true)
-            status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.MUSIC_DIR}/$jobTitle"
-        } finally { f.delete() }
+            try { client().download(id, stem, f, fmt) { progress = it } }
+            catch (e: NoFullQualityException) { offerWav(e); return@task }
+            val uri = Saver.saveAudio(ctx, f, folder, name, fmt.mime, replace = true)
+            status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.MUSIC_DIR}/$folder"
+        } finally { f.delete() }  // a failed download leaves a partial file too
     }
 
     /** SHARE on one stem: the share sheet, with a cache copy only we and the chosen app can read. */
@@ -404,32 +433,53 @@ class AppState(private val ctx: Context) {
         status = "Sharing ${f.name}"
     }
 
-    /** Save all: every stem into Music/Rytm Mobile/<track>/. */
+    /**
+     * Save all: every stem into Music/Rytm Mobile/<track> (<mode>)/. A stem the computer has no FLAC for is
+     * saved as its 48k WAV instead (the rest carry on as FLAC), and the status says which ones.
+     */
     fun saveAllStemFiles() = task("Saving all stems…") {
+        saveNote = null
         val id = jobId ?: throw Exception("No job open")
         val stems = job?.stems ?: emptyList()
-        val fmt = quality; val c = client()
+        val c = client(); val folder = saveFolder
+        var fmt = quality
+        val wavStems = mutableListOf<String>()
         stems.forEachIndexed { i, s ->
             status = "Saving ${i + 1}/${stems.size}: $s"
-            val name = StemClient.stemFileName(jobTitle, s, fmt)
-            val f = try { c.download(id, s, tmp(name), fmt) { p -> progress = (i + p) / stems.size } }
-                catch (e: NoFullQualityException) { offerWav(e); return@task }
-            try { Saver.saveAudio(ctx, f, jobTitle, name, fmt.mime, replace = true) } finally { f.delete() }
+            var useFmt = fmt
+            var f = tmp(StemClient.stemFileName(jobTitle, s, useFmt))
+            try {
+                try { c.download(id, s, f, useFmt) { p -> progress = (i + p) / stems.size } }
+                catch (e: NoFullQualityException) {
+                    f.delete()
+                    if (e.wholeJob) { noFullQuality = id; quality = StemFormat.WAV; fmt = StemFormat.WAV }  // the rest have none either
+                    useFmt = StemFormat.WAV
+                    f = tmp(StemClient.stemFileName(jobTitle, s, useFmt))
+                    c.download(id, s, f, useFmt) { p -> progress = (i + p) / stems.size }
+                    wavStems += s
+                }
+                Saver.saveAudio(ctx, f, folder, StemClient.stemFileName(jobTitle, s, useFmt), useFmt.mime, replace = true)
+            } finally { f.delete() }
         }
         progress = 1f
-        status = "Saved ${stems.size} stems to ${Saver.MUSIC_DIR}/$jobTitle (${if (fmt == StemFormat.FLAC) "full-quality FLAC" else "48k WAV"})"
+        status = StemClient.saveAllSummary(stems.size, folder, quality, wavStems)
+        saveNote = if (wavStems.isEmpty()) null else status
     }
 
     /** One zip of every stem into Download/Rytm Mobile/. */
     fun saveZip() = task("Zipping stems on the computer…") {
+        saveNote = null
         val id = jobId ?: throw Exception("No job open")
         val fmt = quality
-        val name = StemClient.zipFileName(jobTitle, fmt)
-        val f = try { client().zip(id, fmt, tmp(name)) { progress = it } }
-            catch (e: NoFullQualityException) { offerWav(e); return@task }
+        val name = StemClient.zipFileName(saveFolder, fmt)
+        val f = tmp(name)
         try {
-            val uri = Saver.saveDownload(ctx, f, name, "application/zip", replace = true)
-            status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.DOWNLOAD_DIR}"
+            val z = try { client().zip(id, fmt, f) { progress = it } }
+                catch (e: NoFullQualityException) { offerWav(e); return@task }
+            val uri = Saver.saveDownload(ctx, z.file, name, "application/zip", replace = true)
+            val note = StemClient.zipNote(job?.stems?.size ?: 0, z.missing)
+            status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.DOWNLOAD_DIR}.$note"
+            saveNote = note.trim().ifEmpty { null }
         } finally { f.delete() }
     }
 
