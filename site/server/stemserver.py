@@ -5,8 +5,12 @@ GET  /jobs                               -> every job on this server, newest fir
 GET  /jobs/{id}                          -> status, stems
 GET  /jobs/{id}/stems/{name}             -> 48 kHz mono 16-bit WAV (Rytm-ready)
 GET  /jobs/{id}/stems/{name}?format=flac -> full-quality stereo FLAC at the separator's rate
-GET  /jobs/{id}/zip?format=wav|flac      -> every stem of the job in one zip
+GET  /jobs/{id}/zip?format=wav|flac      -> every stem of the job in one zip; stems with no file for that
+                                            format are left out and named in the X-Stems-Missing header
+                                            (comma-separated) and in a MISSING.txt inside the zip
+DELETE /jobs/{id}                        -> removes that job's folder (404 unknown, 409 while queued or running)
 GET  /models                             -> the models offered
+POST /jobs answers 507 when the disk holding STEM_DIR has less than STEM_MIN_FREE_MB (default 2048) free.
 Auth: header X-Token must match env STEM_TOKEN. The server refuses to start without one.
 """
 import os, uuid, threading, queue, subprocess, shutil, glob, re, traceback, hmac, json, time, tempfile, zipfile
@@ -24,6 +28,7 @@ if not TOKEN:
 MAX_UPLOAD = int(os.environ.get("STEM_MAX_UPLOAD_MB", "2048")) * 1024 * 1024
 MAX_SECONDS = int(os.environ.get("STEM_MAX_SECONDS", "1800"))  # longest input that gets split
 MODEL_DIR = os.environ.get("STEM_MODELS", str(ROOT.parent / "models"))
+MIN_FREE = int(os.environ.get("STEM_MIN_FREE_MB", "2048")) * 1024 * 1024  # refuse new jobs below this
 
 
 def _ffmpeg():
@@ -91,6 +96,7 @@ def _pick_models():
 MODELS = _pick_models()
 
 jobs = {}
+jobs_lock = threading.Lock()
 q = queue.Queue()
 
 
@@ -267,6 +273,10 @@ async def create(file: UploadFile = File(...), model: str = Form("stems"), x_tok
     check(x_token)
     if model not in MODELS:
         raise HTTPException(400, "unknown model" if model not in CANDIDATES else "this computer can't run that model")
+    free = shutil.disk_usage(ROOT).free
+    if free < MIN_FREE:
+        raise HTTPException(507, f"The computer is almost out of disk space ({free / 2**30:.1f} GB free, "
+                                 f"{MIN_FREE / 2**30:.1f} GB needed). Delete old splits in History, or free some space, then try again.")
     jid = uuid.uuid4().hex[:12]
     d = ROOT / jid; d.mkdir()
     ext = Path(file.filename or "in.wav").suffix or ".wav"
@@ -309,6 +319,24 @@ def status(jid: str, x_token: str = Header("")):
     if isinstance(j, HTTPException):
         raise j
     return {k: v for k, v in j.items() if k != "src"} | {"queue": q.qsize()}
+
+
+@app.delete("/jobs/{jid}")
+def delete_job(jid: str, x_token: str = Header("")):
+    """Removes one job's folder (stems, FLAC copies, the upload). A queued or running job is refused."""
+    check(x_token)
+    with jobs_lock:
+        j = jobs.get(jid)
+        if not j:
+            raise HTTPException(404, "no such job")
+        if j.get("status") in ("queued", "running"):
+            raise HTTPException(409, "This split is still running. Delete it when it has finished.")
+        d = (ROOT / jid).resolve()
+        if d.parent != ROOT.resolve():
+            raise HTTPException(404, "no such job")
+        jobs.pop(jid, None)
+    shutil.rmtree(d, ignore_errors=True)
+    return {"deleted": jid}
 
 
 OLD_JOB = "no full-quality copy for this older job"
@@ -377,23 +405,28 @@ def stems_zip(jid: str, format: str = Query("wav"), x_token: str = Header("")):
     fd, tmp = tempfile.mkstemp(prefix="rytm-stems-", suffix=".zip")
     os.close(fd)
     try:
-        used = set()
+        used, missing = set(), []
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
             for name in names:
                 try:
                     p = stem_file(jid, j, name, format)
                 except HTTPException:
-                    continue  # a stem whose FLAC couldn't be made: the zip carries the rest
+                    missing.append(name)  # a stem whose FLAC couldn't be made: the zip carries the rest
+                    continue
                 arc = f"{track}_{safe_name(name, 'stem')}.{format}"
                 n = 2
                 while arc in used:
                     arc = f"{track}_{safe_name(name, 'stem')}_{n}.{format}"; n += 1
                 used.add(arc)
                 z.write(p, arc)
+            if missing:
+                z.writestr("MISSING.txt", f"These stems have no {format.upper()} file on the computer, so they are not in this zip:\n"
+                           + "\n".join(missing) + "\n")
         if not used:
             raise HTTPException(404, "no stem files left for this job")
     except BaseException:
         os.unlink(tmp)
         raise
+    headers = {"X-Stems-Missing": ",".join(missing)} if missing else None
     return FileResponse(tmp, media_type="application/zip", filename=f"{track}_stems_{format}.zip",
-                        background=BackgroundTask(os.unlink, tmp))
+                        headers=headers, background=BackgroundTask(os.unlink, tmp))
