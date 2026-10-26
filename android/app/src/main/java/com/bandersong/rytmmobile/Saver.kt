@@ -51,8 +51,19 @@ object Saver {
         val r = ctx.contentResolver
         if (replace) ours(ctx, collection, relPath, name)?.let { uri ->
             r.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 1) }, null, null)
-            (r.openOutputStream(uri, "wt") ?: throw IOException("The phone wouldn't open $name for writing")).use { data.copyTo(it, 64 * 1024) }
-            r.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+            var opened = false
+            try {
+                val out = r.openOutputStream(uri, "wt") ?: throw IOException("The phone wouldn't open $name for writing")
+                opened = true  // "wt" has emptied the file: from here on a failure leaves it half-written
+                out.use { data.copyTo(it, 64 * 1024) }
+                r.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+            } catch (e: Throwable) {
+                // Never leave the item pending (hidden from every app). If we had already emptied it, the
+                // old copy is gone anyway, so take the broken one away; otherwise just un-hide the old one.
+                if (opened) runCatching { r.delete(uri, null, null) }
+                else runCatching { r.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null) }
+                throw e
+            }
             return uri
         }
         val v = ContentValues().apply {
@@ -65,7 +76,7 @@ object Saver {
         try {
             (r.openOutputStream(uri, "w") ?: throw IOException("The phone wouldn't open $name for writing")).use { data.copyTo(it, 64 * 1024) }
             r.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // Our own half-written item: take it away again so no broken file is left behind.
             runCatching { r.delete(uri, null, null) }
             throw e
