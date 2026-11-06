@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.sp
 import com.bandersong.rytmmobile.*
 
 /** INTEGRATION with the recording branch: return its "recording now" state here. One line, this file only (§8 R1). */
-private fun AppState.recordingNow(): Boolean = false
+private fun AppState.recordingNow(): Boolean = capturing
 
 private const val NOTICE_LEAD = "Every feature works, today and forever: nothing is locked and nothing expires."
 private const val NOTICE_ASK = "If Rytm Mobile earns a place in your setup, please support it. Once you have, tap I've supported it and this note won't come back."
