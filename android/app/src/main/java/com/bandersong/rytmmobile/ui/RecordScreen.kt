@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -57,7 +58,7 @@ fun RecorderScreen(vm: AppState, onAskAgain: () -> Unit, onOpenFile: () -> Unit)
     val r by vm.rec.meter.collectAsState()
     val live by vm.rec.live.collectAsState()
     val takes by vm.rec.takes.collectAsState()
-    val act = LocalContext_activity()
+    val act = LocalContext.current.findActivity()
     val st = m.state
 
     // The screen stays on while the mic is open: a locked screen ends the take.
@@ -113,9 +114,6 @@ fun RecorderScreen(vm: AppState, onAskAgain: () -> Unit, onOpenFile: () -> Unit)
         }
     }
 }
-
-@Composable
-private fun LocalContext_activity(): Activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
 
 /* ───────────────────────────── state cards ───────────────────────────── */
 
