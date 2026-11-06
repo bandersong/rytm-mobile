@@ -270,7 +270,7 @@ private fun ChopEditor(vm: AppState, onRecord: () -> Unit, onOpen: () -> Unit) =
     }
     Panel("Sample", "48k mono", accent = P.Cv, trailing = {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            GhostButton("Rec", onRecord, color = P.Signal, enabled = !vm.busy); Spacer(Modifier.width(6.dp)); GhostButton("Open", onOpen, enabled = !vm.busy)
+            GhostButton("Rec", onRecord, Modifier.widthIn(min = 48.dp), color = P.Signal, tall = true, enabled = !vm.busy); Spacer(Modifier.width(8.dp)); GhostButton("Open", onOpen, tall = true, enabled = !vm.busy)
         }
     }) {
         Field("Name on Rytm", vm.clipName, { vm.clipName = AppState.clean(it) })

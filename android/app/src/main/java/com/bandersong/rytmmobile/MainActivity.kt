@@ -311,10 +311,18 @@ class AppState(private val ctx: Context) {
     fun onMicPermission(granted: Boolean, rationale: Boolean) = rec.permissionResult(granted, rationale)
     fun askMicAgain() = rec.askAgain()
     fun retryRecorder() = rec.retry()
-    fun closeRecorder() = rec.close()
+    /** True while LISTEN is playing a take; drives the Stop control on the take card. */
+    var listening by mutableStateOf(false)
+    fun stopListen() { Audio.stop(); listening = false }
+    fun closeRecorder() { stopListen(); rec.close() }
     fun selectInput(key: String) = rec.pick(key)
     fun resetClipLight() = rec.resetClip()
-    fun toggleRec() = when (recModel.state) { is RecState.Recording -> rec.stop(); is RecState.Armed -> { Audio.stop(); rec.rec() }; else -> Unit }
+    fun toggleRec() = when (recModel.state) {
+        is RecState.Recording -> { stopListen(); rec.stop() }
+        // A LISTEN or other task still loading would play the old take into the new one: REC waits for it.
+        is RecState.Armed -> if (!busy) { stopListen(); rec.rec() } else Unit
+        else -> Unit
+    }
     fun onHostStarted(granted: Boolean, rationale: Boolean) = rec.hostStarted(granted, rationale)
     fun onHostStopped() = rec.hostStopped()
     fun setAutoTrimPref(on: Boolean) { autoTrim = on; prefs.edit().putBoolean("autoTrim", on).apply() }
@@ -336,8 +344,13 @@ class AppState(private val ctx: Context) {
     fun listenTake(t: Take) = task("Loading ${t.id} to listen…") {
         if (!chopFits(t)) throw Exception("${t.id} is too long to play here. Chop it or split it.")
         val c = WavIo.readMono(t.file, pickFor(t))
-        withContext(Dispatchers.Main) { Audio.play(c) }
-        status = "Playing ${t.id}"
+        withContext(Dispatchers.Main) {
+            // Recording may have started while the file loaded: never play a take into a recording.
+            if (capturing || rec.model.value.capturing) { status = "Not played: recording started."; return@withContext }
+            Audio.play(c) { listening = false }
+            listening = true
+            status = "Playing ${t.id}"
+        }
     }
     fun saveTake(t: Take) = task("Saving ${t.id}…") {
         val uri = Saver.saveAudio(ctx, t.file, "Recordings", "${t.id}.wav", StemFormat.WAV.mime, replace = true)

@@ -9,6 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -110,6 +112,8 @@ fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
 fun RecButton(
     recording: Boolean, enabled: Boolean, label: String, onClick: () -> Unit,
     modifier: Modifier = Modifier, height: Dp = 72.dp,
+    description: String = if (recording) "Stop recording" else "Start recording",
+    stateText: String = if (recording) "Recording" else "Ready",
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
@@ -125,8 +129,8 @@ fun RecButton(
                 .background(if (enabled) P.Signal else P.Well)
                 .border(2.dp, P.Shade, shape)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = if (recording) "Stop recording" else "Start recording"
-                    stateDescription = if (recording) "Recording" else "Ready"
+                    contentDescription = description
+                    stateDescription = stateText
                 }
                 .clickable(src, null, enabled = enabled, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
@@ -202,10 +206,13 @@ fun StepProgress(progress: Float, modifier: Modifier = Modifier, color: Color = 
 
 /** Hardware-style toggle: label + LED. */
 @Composable
-fun Switch(label: String, on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+fun Switch(label: String, on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, exclusive: Boolean = false) {
+    // TalkBack gets the on/off state; a choice among several (exclusive) is a radio button, not an independent switch.
+    val semanticsMod = if (exclusive) Modifier.selectable(on, role = Role.RadioButton) { onChange(true) }
+    else Modifier.toggleable(on, role = Role.Switch, onValueChange = onChange)
     Row(
         modifier.clip(RoundedCornerShape(3.dp)).background(P.Well).border(1.dp, if (on) P.Cv.copy(alpha = .6f) else P.Line, RoundedCornerShape(3.dp))
-            .clickable(role = Role.Switch) { onChange(!on) }.padding(horizontal = 10.dp, vertical = 8.dp),
+            .then(semanticsMod).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Led(on, P.Cv); Spacer(Modifier.width(8.dp)); Text(label.uppercase(), style = T.Label.copy(color = if (on) P.Ink else P.Muted))

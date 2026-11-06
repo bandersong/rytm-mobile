@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +27,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -60,6 +62,18 @@ fun RecorderScreen(vm: AppState, onAskAgain: () -> Unit, onOpenFile: () -> Unit)
     val takes by vm.rec.takes.collectAsState()
     val act = LocalContext.current.findActivity()
     val st = m.state
+
+    // Back closes the recorder; it never ends a take by accident (leaving the screen would).
+    BackHandler { if (vm.capturing) vm.status = "Stop recording first." else vm.closeRecorder() }
+
+    // A take that stops by itself, a recovery, a new input: say it, because the header status is not a live region.
+    val notice by vm.rec.notice.collectAsState()
+    val view = LocalView.current
+    val firstSeq = remember { notice?.seq }
+    LaunchedEffect(notice?.seq) {
+        val n = notice
+        if (n != null && n.seq != firstSeq) view.announceForAccessibility(n.text)
+    }
 
     // The screen stays on while the mic is open: a locked screen ends the take.
     val awake = st is RecState.Opening || st is RecState.Armed || st is RecState.Recording || st is RecState.Finalizing
@@ -128,7 +142,7 @@ private fun StateCards(vm: AppState, m: RecModel, onAskAgain: () -> Unit, onOpen
                     GhostButton("Close", vm::closeRecorder, tall = true)
                 }
                 Perm.RATIONALE -> {
-                    Text("Recording needs the microphone. Rytm Mobile listens only while this screen is open, and keeps audio only after you tap REC. Opening, chopping, sending and splitting all work without it.", style = T.Body)
+                    Text("Recording needs the microphone. Rytm Mobile listens only while this screen is open, and keeps nothing until you tap REC (then the half second before the tap, so a take never starts late). Opening, chopping, sending and splitting all work without it.", style = T.Body)
                     Spacer(Modifier.height(14.dp))
                     HardButton("Allow microphone", onAskAgain, color = P.Signal)
                     Spacer(Modifier.height(10.dp))
@@ -151,7 +165,7 @@ private fun StateCards(vm: AppState, m: RecModel, onAskAgain: () -> Unit, onOpen
         is RecState.NoInput -> Panel("Input", accent = P.Signal) {
             Row(verticalAlignment = Alignment.Top) {
                 Jack(P.Signal, false, 22.dp); Spacer(Modifier.width(12.dp))
-                Text("No microphone or audio input found. Plug in a USB mic or audio interface with a USB‑C OTG cable; it shows up here by itself.", style = T.Body, modifier = Modifier.weight(1f))
+                Text("No microphone or audio input found. Plug in a USB mic or audio interface with a USB‑C OTG cable; it shows up here by itself. $MK1_NOTE", style = T.Body, modifier = Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -210,12 +224,13 @@ private fun InputPanel(vm: AppState, m: RecModel, st: RecState) {
             Spacer(Modifier.height(8.dp))
             GhostButton("Try again", vm::retryRecorder, color = P.Signal, tall = true)
         }
-        if (m.inputs.any { it.kind == InputKind.USB_DEVICE || it.kind == InputKind.USB_HEADSET }) {
-            Spacer(Modifier.height(8.dp))
-            Text("Rytm MK1: its USB port carries MIDI only. Patch its Main Out or Headphones into a USB interface to record it.", style = T.Small)
-        }
+        // Always shown: the reader with a Rytm on the single USB port has no USB audio input to trigger it.
+        Spacer(Modifier.height(8.dp))
+        Text(MK1_NOTE, style = T.Small)
     }
 }
+
+private const val MK1_NOTE = "Rytm MK1: its USB port carries MIDI only. Patch its Main Out or Headphones into a USB interface to record it."
 
 /* ───────────────────────────── level ───────────────────────────── */
 
@@ -227,7 +242,7 @@ private fun LevelPanel(vm: AppState, m: RecModel, r: MeterReading) {
     val holds = if (r.holdDb.size >= ch) r.holdDb else List(ch) { Db.FLOOR }
     Panel("Level", words, accent = P.Signal, trailing = {
         Row(
-            Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) { vm.resetClipLight() }
+            Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).clickable(role = Role.Button) { vm.resetClipLight() }
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
                     contentDescription = if (r.clipped) "Clipped. Double-tap to reset" else "No clipping"
@@ -255,14 +270,17 @@ private fun LevelPanel(vm: AppState, m: RecModel, r: MeterReading) {
         }
         if (ch == 2) {
             Spacer(Modifier.height(12.dp))
-            val pick = vm.recPick ?: ChannelPick.suggest(r.holdDb)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Switch("L+R", pick == ChannelPick.MIX, { vm.recPick = ChannelPick.MIX })
-                Switch("L only", pick == ChannelPick.LEFT, { vm.recPick = ChannelPick.LEFT })
-                Switch("R only", pick == ChannelPick.RIGHT, { vm.recPick = ChannelPick.RIGHT })
+            // After a take, show what chopping that take will use (its peaks); before one, the live suggestion.
+            val take = if (!m.capturing) m.lastTake else null
+            val pick = ChannelPick.shown(vm.recPick, take?.peakDb, r.holdDb)
+            Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch("L+R", pick == ChannelPick.MIX, { vm.recPick = ChannelPick.MIX }, exclusive = true)
+                Switch("L only", pick == ChannelPick.LEFT, { vm.recPick = ChannelPick.LEFT }, exclusive = true)
+                Switch("R only", pick == ChannelPick.RIGHT, { vm.recPick = ChannelPick.RIGHT }, exclusive = true)
             }
             Spacer(Modifier.height(6.dp))
-            Text("Used when you chop or listen. The take keeps both channels.", style = T.Small)
+            Text(if (take != null || vm.recPick != null) "Used when you chop or listen. The take keeps both channels."
+                else "Suggested from the live level; each take is checked again when you chop or listen. The take keeps both channels.", style = T.Small)
         }
         val hint: Pair<String, Color>? = when {
             m.silenced -> "Another app or a call has the mic. You'd be recording silence." to P.Signal
@@ -347,7 +365,8 @@ private fun TakeCard(vm: AppState, t: Take) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HardButton("Chop it", { vm.useTake(t) }, color = P.Cv, small = true, enabled = !vm.busy)
             Spacer(Modifier.width(8.dp))
-            GhostButton("Listen", { vm.listenTake(t) }, tall = true, enabled = !vm.busy)
+            if (vm.listening) GhostButton("Stop", vm::stopListen, color = P.Signal, tall = true)
+            else GhostButton("Listen", { vm.listenTake(t) }, tall = true, enabled = !vm.busy)
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -411,20 +430,21 @@ private fun TransportBar(vm: AppState, m: RecModel, r: MeterReading, short: Bool
     val fmt = st.format()
     val rate = fmt?.rate?.takeIf { it > 0 } ?: r.rate.takeIf { it > 0 } ?: 48000
     val sec = if (st is RecState.Recording) r.takeFrames / rate.toDouble() else 0.0
-    val maxS = (st as? RecState.Recording)?.maxSeconds ?: FormatLadder.MAX_TAKE_S
-    val timer = when (st) {
-        is RecState.Recording -> Clock.of(sec)
-        is RecState.Armed -> "READY"
-        is RecState.Opening -> "OPENING…"
-        is RecState.Finalizing -> "SAVING…"
-        else -> "—"
+    // Armed shows the limit REC will really apply: the 30-minute cap, or less when free storage is short.
+    val armedMax = (st as? RecState.Armed)?.let { a ->
+        remember(a.input.id, a.open.rate, a.open.channels) {
+            TakeBudget.maxSeconds(vm.rec.takeDir.usableSpace, a.open.rate * a.open.channels * 2)
+        }
     }
+    val maxS = (st as? RecState.Recording)?.maxSeconds ?: armedMax ?: FormatLadder.MAX_TAKE_S
+    val timer = TransportText.timer(st, sec)
     val timerColor = when {
         st is RecState.Recording && sec >= maxS - 30 -> P.Cv
         st is RecState.Recording -> P.Signal
         else -> P.Ink
     }
-    val spoken = Clock.spoken(Math.floor(sec))
+    val spoken = TransportText.spoken(st, sec)
+    val (recDesc, recState) = TransportText.recButton(st)
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(timer, style = T.Data.copy(fontSize = if (short) 26.sp else 34.sp, color = timerColor), maxLines = 1,
@@ -443,6 +463,7 @@ private fun TransportBar(vm: AppState, m: RecModel, r: MeterReading, short: Bool
             label = when (st) { is RecState.Recording -> "Stop"; is RecState.Opening -> "Opening…"; is RecState.Finalizing -> "Saving…"; else -> "Rec" },
             onClick = vm::toggleRec,
             height = if (short) 56.dp else 72.dp,
+            description = recDesc, stateText = recState,
         )
     }
 }
