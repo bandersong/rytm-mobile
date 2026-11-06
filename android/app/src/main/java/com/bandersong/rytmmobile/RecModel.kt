@@ -50,6 +50,8 @@ data class RecModel(
     val silenced: Boolean = false,
     val note: String? = null,                  // routing mismatch; cleared on Opening
     val lastTake: Take? = null,
+    val inputLost: Boolean = false,            // while Finalizing: the capture thread died or the route moved
+    val resume: RecEvent.HostStarted? = null,  // HostStarted that arrived while Finalizing(BACKGROUND)
 ) {
     val capturing: Boolean get() = state is RecState.Recording || state is RecState.Finalizing
     val current: InputInfo? get() = when (val s = state) {
@@ -65,6 +67,7 @@ sealed interface RecEvent {
     data class Devices(val inputs: List<InputInfo>) : RecEvent
     data class Pick(val key: String) : RecEvent
     data object Retry : RecEvent
+    data object Reopen : RecEvent                                            // reopen the current input (debug fake changes)
     data class Opened(val inputId: Int, val open: OpenFormat) : RecEvent
     data class OpenFailed(val inputId: Int, val message: String) : RecEvent
     data class Rec(val budgetSeconds: Int, val takeId: String) : RecEvent
@@ -152,6 +155,13 @@ object RecMachine {
                 if (i != null && m.inputs.any { it.id == i.id }) open(m, i) else openBestOrNone(m, m.inputs)
             } else m to emptyList()
 
+            RecEvent.Reopen -> when (s) {
+                is RecState.Opening -> open(m, s.input)
+                is RecState.Armed -> open(m, s.input)
+                is RecState.Failed -> s.input?.let { open(m, it) } ?: (m to emptyList())
+                else -> m to emptyList()
+            }
+
             is RecEvent.Opened ->
                 if (s is RecState.Opening && e.inputId == s.input.id)
                     m.copy(state = RecState.Armed(s.input, e.open), note = noteFor(s.input, e.open.routedName, e.open.routedMatches)) to emptyList()
@@ -178,6 +188,8 @@ object RecMachine {
                     m.copy(state = RecState.Finalizing(s.input, s.open, s.takeId, e.reason)) to listOf(RecEffect.EndTake(e.reason))
                 s is RecState.Armed && e.reason == StopReason.READ_ERROR ->
                     m.copy(state = RecState.Failed(s.input, "Lost ${L(s.input)}. Tap Try again or pick another input.")) to listOf(RecEffect.CloseInput)
+                // The capture thread posts this once and exits: remember it so next() reopens instead of re-arming a dead input.
+                s is RecState.Finalizing && e.reason == StopReason.READ_ERROR -> m.copy(inputLost = true) to emptyList()
                 else -> m to emptyList()
             }
 
@@ -191,6 +203,8 @@ object RecMachine {
                     val f = s.open.copy(routedId = e.routedId, routedName = e.routedName, routedMatches = matches)
                     m.copy(state = RecState.Armed(s.input, f), note = noteFor(s.input, e.routedName, matches)) to emptyList()
                 }
+                is RecState.Finalizing ->
+                    if (e.routedId != null && e.routedId != s.open.routedId) m.copy(inputLost = true) to emptyList() else m to emptyList()
                 else -> m to emptyList()
             }
 
@@ -217,7 +231,7 @@ object RecMachine {
                         listOf(RecEffect.EndTake(StopReason.BACKGROUND), RecEffect.CloseInput)
                 is RecState.Opening, is RecState.Armed, is RecState.Failed, RecState.NoInput ->
                     m.copy(hostVisible = false, state = RecState.Paused) to listOf(RecEffect.CloseInput)
-                else -> m.copy(hostVisible = false) to emptyList()
+                else -> m.copy(hostVisible = false, resume = null) to emptyList()
             }
 
             is RecEvent.HostStarted -> {
@@ -232,6 +246,7 @@ object RecMachine {
                         val inputs = InputPicker.markNew(emptyList(), e.inputs)
                         openBestOrNone(shown.copy(inputs = inputs), inputs)
                     }
+                    s is RecState.Finalizing -> shown.copy(resume = e) to emptyList()    // next() resumes when the take is saved
                     else -> shown to emptyList()
                 }
             }
@@ -270,15 +285,28 @@ object RecMachine {
     }
 
     /** What follows the end of a take. [lead] effects run first. */
-    private fun next(m: RecModel, s: RecState.Finalizing, lead: List<RecEffect>): Step {
+    private fun next(m0: RecModel, s: RecState.Finalizing, lead: List<RecEffect>): Step {
         val i = s.input
         val r = s.reason
+        val lost = m0.inputLost
+        val resume = m0.resume
+        val m = m0.copy(inputLost = false, resume = null)
+        val gone = m.inputs.none { it.id == i.id }
         val (m2, fx) = when {
-            r == StopReason.BACKGROUND -> m.copy(state = RecState.Paused) to emptyList()    // input already closed
+            r == StopReason.BACKGROUND -> when {
+                // The app came back before the take was saved: reopen as HostStarted would have.
+                m.hostVisible && resume != null && resume.granted -> {
+                    val inputs = InputPicker.markNew(emptyList(), m.inputs)
+                    openBestOrNone(m.copy(inputs = inputs), inputs)
+                }
+                m.hostVisible && resume != null -> m.copy(state = permFor(resume.rationale)) to emptyList<RecEffect>()
+                else -> m.copy(state = RecState.Paused) to emptyList()                           // input already closed
+            }
             !m.hostVisible -> m.copy(state = RecState.Paused) to listOf<RecEffect>(RecEffect.CloseInput)
             r == StopReason.UNPLUGGED -> openBestOrNone(m, m.inputs.filter { it.id != i.id })
-            r == StopReason.READ_ERROR || r == StopReason.ROUTE_CHANGED ->
-                if (m.inputs.any { it.id == i.id }) open(m, i) else openBestOrNone(m, m.inputs)
+            // The input died or went away while the take was being saved: never re-arm it as it was.
+            r == StopReason.READ_ERROR || r == StopReason.ROUTE_CHANGED || lost || gone ->
+                if (!gone) open(m, i) else openBestOrNone(m, m.inputs)
             else -> m.copy(state = RecState.Armed(i, s.open)) to emptyList()                // monitoring continues
         }
         return m2 to (lead + fx)
@@ -452,7 +480,7 @@ object TakeText {
             StopReason.SILENCED -> "Stopped: a call or another app took the microphone. The $c before that is kept."
             StopReason.READ_ERROR -> "Stopped: $n stopped sending audio. The $c before that is kept."
             StopReason.BACKGROUND -> "Stopped when Rytm Mobile left the screen. The $c before that is kept."
-            StopReason.MAX_LENGTH -> "Stopped at the take limit ($c)."
+            StopReason.MAX_LENGTH -> "Stopped at the take limit ($c): 30 minutes, or less when phone storage is low."
             StopReason.DISK_FULL -> "Stopped: phone storage is full. The $c before that is kept."
             StopReason.RECOVERED -> "Recovered after the app closed during a take ($c)."
         }
@@ -486,5 +514,59 @@ data class FakeSpec(
             }
             return f
         }
+    }
+}
+
+/** The "Couldn't open" line: names only the formats the ladder really tried for this kind of input. */
+object OpenText {
+    fun failed(i: InputInfo, tried: Int): String {
+        val label = InputPicker.label(i)
+        val ways = if (tried == 1) "1 way" else "$tried ways"
+        return when (i.kind) {
+            InputKind.USB_DEVICE, InputKind.USB_HEADSET, InputKind.LINE_IN ->
+                "Couldn't open $label. Tried $ways, at 48 and 44.1 kHz, stereo and mono. Some USB Audio Class 2-only interfaces may not work. " +
+                    "Pick another input, or unplug it and plug it back in."
+            else -> "Couldn't open $label. Tried $ways, at 48 and 44.1 kHz, mono. Pick another input."
+        }
+    }
+}
+
+/** What the transport bar shows and what TalkBack says about it: the same state, never a stale clock. */
+object TransportText {
+    fun timer(st: RecState, sec: Double): String = when (st) {
+        is RecState.Recording -> Clock.of(sec)
+        is RecState.Armed -> "READY"
+        is RecState.Opening -> "OPENING…"
+        is RecState.Finalizing -> "SAVING…"
+        else -> "—"
+    }
+
+    fun spoken(st: RecState, sec: Double): String = when (st) {
+        is RecState.Recording -> Clock.spoken(Math.floor(sec))
+        is RecState.Armed -> "Ready to record"
+        is RecState.Opening -> "Opening the input"
+        is RecState.Finalizing -> "Saving the take"
+        is RecState.Failed -> "Input unavailable"
+        is RecState.Paused -> "Paused"
+        else -> "Not recording"
+    }
+
+    /** (contentDescription, stateDescription) for the REC button. */
+    fun recButton(st: RecState): Pair<String, String> = when (st) {
+        is RecState.Recording -> "Stop recording" to "Recording"
+        is RecState.Armed -> "Start recording" to "Ready"
+        is RecState.Opening -> "Start recording" to "Opening the input"
+        is RecState.Finalizing -> "Start recording" to "Saving the take"
+        is RecState.Failed -> "Start recording" to "Input unavailable"
+        is RecState.Paused -> "Start recording" to "Paused"
+        else -> "Start recording" to "Unavailable"
+    }
+}
+
+/** Phone-mic route ids: a collapsed "Phone mic" entry stands for every built-in mic entry Android may route to. */
+object RouteId {
+    fun normalize(routedId: Int?, routedKind: InputKind?, input: InputInfo): Int? {
+        if (routedId == null || input.kind != InputKind.BUILTIN_MIC) return routedId
+        return if (routedKind == InputKind.BUILTIN_MIC) input.id else routedId
     }
 }

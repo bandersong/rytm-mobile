@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "RytmRec"
+private const val FAKE_ID = -1
 
 /** Maps AudioManager devices to the pure InputInfo model. The only place that knows AudioDeviceInfo types. */
 object AudioInputs {
@@ -260,8 +261,12 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
 
     /** Debug builds only (the caller checks BuildConfig.DEBUG). null = real inputs. */
     fun setFake(spec: FakeSpec?) = ctl.execute {
+        val before = _model.value.current?.takeIf { it.id == FAKE_ID && it.kind == InputKind.USB_DEVICE }
+        val gen = openGen.get()
         fake = spec; fakeUnplugged = false
         apply(RecEvent.Devices(inputs()))
+        // Same fake id and key: Devices alone changes nothing, so the old FakeSource would keep running. Rebuild it.
+        if (before != null && spec != null && openGen.get() == gen) apply(RecEvent.Reopen)
     }
 
     // --- control thread ----------------------------------------------------------------------------------------
@@ -287,7 +292,7 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
     private fun reloadTakes() { runCatching { _takes.value = store.list() } }
 
     private fun fakeInput(spec: FakeSpec) =
-        InputInfo(-1, InputKind.USB_DEVICE, "Fake input", listOf(48000), if (spec.stereo) listOf(2) else listOf(1))
+        InputInfo(FAKE_ID, InputKind.USB_DEVICE, "Fake input", listOf(48000), if (spec.stereo) listOf(2) else listOf(1))
 
     private fun inputs(): List<InputInfo> {
         val f = fake
@@ -384,7 +389,8 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
                     val matches = s.routedId == null || s.routedId == i.id ||
                         (routedKind == InputKind.BUILTIN_MIC && i.kind == InputKind.BUILTIN_MIC)
                     Log.i(TAG, "open ok source=${attempt.source} rate=${s.rate} ch=${s.channels} bufferFrames=${attempt.bufferFrames} routed=${s.routedName}")
-                    apply(RecEvent.Opened(i.id, OpenFormat(attempt.source, s.rate, s.channels, s.routedId,
+                    // Same id form as the RouteChanged events (routeId): a collapsed Phone mic keeps its own id.
+                    apply(RecEvent.Opened(i.id, OpenFormat(attempt.source, s.rate, s.channels, routeId(s.routedId, i),
                         s.routedName.ifEmpty { label }, matches)))
                 }
                 AudioRecordSource.Attempt.DeviceInvalid -> if (gen == openGen.get()) {
@@ -392,7 +398,7 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
                     post(RecEvent.OpenFailed(i.id, "$label isn't available any more."))
                 }
                 is AudioRecordSource.Attempt.AllFailed -> if (gen == openGen.get()) post(RecEvent.OpenFailed(i.id,
-                    "Couldn't open $label. Tried ${attempt.tried} ways, at 48 and 44.1 kHz, stereo and mono. Pick another input, or unplug it and plug it back in."))
+                    OpenText.failed(i, attempt.tried)))
             }
         } catch (e: Throwable) {
             Log.i(TAG, "open failed: $e")
@@ -404,7 +410,7 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
     private fun routeId(rid: Int?, input: InputInfo): Int? {
         if (rid == null || input.kind != InputKind.BUILTIN_MIC) return rid
         val kind = am.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.id == rid }?.let { AudioInputs.kind(it.type) }
-        return if (kind == InputKind.BUILTIN_MIC) input.id else rid
+        return RouteId.normalize(rid, kind, input)
     }
 
     /** Control thread: builds the DSP objects and starts the capture thread. */
@@ -424,7 +430,6 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
     private fun captureLoop(a: Active) {
         runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO) }
         var published = 0
-        var maxPosted = false
         var unplugPosted = false
         while (a.running) {
             val n = a.loop.step(System.nanoTime())
@@ -432,7 +437,7 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
                 if (a.running) post(RecEvent.Interrupt(StopReason.READ_ERROR))
                 break
             }
-            if (a.loop.reachedMax && !maxPosted) { maxPosted = true; post(RecEvent.Interrupt(StopReason.MAX_LENGTH)) }
+            if (a.loop.pollMax()) post(RecEvent.Interrupt(StopReason.MAX_LENGTH))     // once per take, not once per input
             if (++published % 2 == 0) {
                 _meter.value = a.meter.snapshot(a.loop.takeFrames)
                 _live.value = a.overview.last()
@@ -458,7 +463,8 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
         if (writer != null) {
             t.thread = Thread({ writeLoop(t, a) }, "rytm-rec-wr").also { it.start() }
         }
-        t.clipsAtStart = a.meter.snapshot().clipCount
+        t.clipsAtStart = a.meter.snapshot().totalClips
+        a.meter.resetClip()                              // the take starts with a clean clip light and CLIPS count
         t.dropsAtStart = a.drop.dropouts
         Log.i(TAG, "take $id start")
         a.loop.beginTake(maxSeconds.toLong() * a.src.rate)
@@ -479,7 +485,7 @@ class RecorderEngine(private val ctx: Context, private val prefs: SharedPreferen
         val a = active
         if (a != null) {
             a.loop.endTake()
-            val clips = a.meter.snapshot().clipCount - t.clipsAtStart
+            val clips = a.meter.snapshot().totalClips - t.clipsAtStart
             val drops = a.drop.dropouts - t.dropsAtStart + a.loop.queueDrops
             t.meta = TakeMeta(a.src.rate, a.src.channels, a.loop.preRollFrames, InputPicker.label(a.input), a.source.name,
                 clips.coerceAtLeast(0), drops.coerceAtLeast(0), reason)

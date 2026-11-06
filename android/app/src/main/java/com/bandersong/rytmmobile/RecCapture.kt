@@ -115,6 +115,8 @@ class CaptureLoop(
     private val buf = ShortArray(chunk * ch)
     private val lock = Any()
     private var maxFrames = 0L
+    private var takeSeq = 0                 // bumped by every beginTake
+    private var maxSignalledSeq = 0         // the take whose limit pollMax() already reported
 
     @Volatile var taking: Boolean = false; private set
     @Volatile var takeFrames: Long = 0; private set
@@ -122,6 +124,11 @@ class CaptureLoop(
     @Volatile var queueDrops: Int = 0; private set
     @Volatile var zeroReads: Int = 0; private set
     val reachedMax: Boolean get() = taking && takeFrames >= maxFrames
+
+    /** True exactly once per take, when that take first reaches its limit (a later take on the same loop fires again). */
+    fun pollMax(): Boolean = synchronized(lock) {
+        if (taking && takeFrames >= maxFrames && maxSignalledSeq != takeSeq) { maxSignalledSeq = takeSeq; true } else false
+    }
 
     /** Reads one chunk. Returns frames read, or the negative error code. */
     fun step(nowNanos: Long): Int {
@@ -148,6 +155,7 @@ class CaptureLoop(
     fun beginTake(maxFrames: Long) {
         synchronized(lock) {
             src.markTake()
+            takeSeq++
             this.maxFrames = maxFrames
             takeFrames = 0; queueDrops = 0
             preRollFrames = 0

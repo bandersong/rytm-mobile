@@ -54,6 +54,20 @@ class PcmTest {
     }
 }
 
+class ChannelPickShownTest {
+    @Test fun usesTheTakePeaksWhenThereIsATake() {
+        // quiet room after STOP: live hold would say MIX, but chopping the take uses its peaks
+        assertEquals(ChannelPick.MIX, ChannelPick.suggest(listOf(-55f, -80f)))
+        assertEquals(ChannelPick.LEFT, ChannelPick.shown(null, listOf(-3f, -80f), listOf(-55f, -80f)))
+        // one -55 dB bleed into R: live says LEFT, the take says MIX
+        assertEquals(ChannelPick.MIX, ChannelPick.shown(null, listOf(-3f, -55f), listOf(-10f, -85f)))
+    }
+    @Test fun liveSuggestionBeforeAnyTakeAndUserPickWins() {
+        assertEquals(ChannelPick.LEFT, ChannelPick.shown(null, null, listOf(-10f, -85f)))
+        assertEquals(ChannelPick.RIGHT, ChannelPick.shown(ChannelPick.RIGHT, listOf(-3f, -80f), listOf(-10f, -85f)))
+    }
+}
+
 class ChannelPickTest {
     @Test fun suggestions() {
         assertEquals(ChannelPick.LEFT, ChannelPick.suggest(listOf(-3f, -90f)))
@@ -148,7 +162,10 @@ class LevelMeterTest {
         assertTrue("reset is consumed by the next feed", m.snapshot().clipped)
         m.feed(chunk(1000), 960)
         assertFalse(m.snapshot().clipped)
-        assertEquals("the count keeps counting", 2, m.snapshot().clipCount)
+        assertEquals("the CLIPS readout restarts with the light", 0, m.snapshot().clipCount)
+        assertEquals("the running total (take clip counts) does not", 2, m.snapshot().totalClips)
+        m.feed(chunk(32767), 960)
+        assertEquals(1, m.snapshot().clipCount); assertEquals(3, m.snapshot().totalClips)
         // exactly at the threshold counts; just under does not
         val m2 = LevelMeter(1, rate)
         m2.feed(chunk(32000), 960)   // 0.9765
@@ -210,6 +227,22 @@ class LevelMeterTest {
         m.feed(chunk(10), 960); m.feed(chunk(10), 960)
         val s = m.snapshot(1234)
         assertEquals(1920L, s.frames); assertEquals(1234L, s.takeFrames); assertEquals(rate, s.rate)
+    }
+}
+
+class LevelMeterThreadingTest {
+    /** snapshot() runs on the control thread while the capture thread feeds: it used to throw CME / NPE from the shared deque. */
+    @Test fun snapshotWhileFeedingNeverThrows() {
+        val m = LevelMeter(2, 48000)
+        val buf = ShortArray(960 * 2) { (it * 37 % 20000).toShort() }
+        val failures = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
+        val run = java.util.concurrent.atomic.AtomicBoolean(true)
+        val feeder = Thread { try { while (run.get()) m.feed(buf, 960) } catch (t: Throwable) { failures.set(t) } }
+        feeder.start()
+        val end = System.nanoTime() + 600_000_000L
+        try { while (System.nanoTime() < end) m.snapshot() } catch (t: Throwable) { failures.set(t) }
+        run.set(false); feeder.join()
+        assertEquals(null, failures.get())
     }
 }
 

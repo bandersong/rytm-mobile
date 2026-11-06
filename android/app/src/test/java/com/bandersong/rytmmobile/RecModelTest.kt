@@ -258,7 +258,7 @@ class TakeTextTest {
         assertEquals("Stopped: a call or another app took the microphone. The $c before that is kept.", TakeText.stopLine(StopReason.SILENCED, t))
         assertEquals("Stopped: $n stopped sending audio. The $c before that is kept.", TakeText.stopLine(StopReason.READ_ERROR, t))
         assertEquals("Stopped when Rytm Mobile left the screen. The $c before that is kept.", TakeText.stopLine(StopReason.BACKGROUND, t))
-        assertEquals("Stopped at the take limit ($c).", TakeText.stopLine(StopReason.MAX_LENGTH, t))
+        assertEquals("Stopped at the take limit ($c): 30 minutes, or less when phone storage is low.", TakeText.stopLine(StopReason.MAX_LENGTH, t))
         assertEquals("Stopped: phone storage is full. The $c before that is kept.", TakeText.stopLine(StopReason.DISK_FULL, t))
         assertEquals("Recovered after the app closed during a take ($c).", TakeText.stopLine(StopReason.RECOVERED, t))
         // there is a row for every reason

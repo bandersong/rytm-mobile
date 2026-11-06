@@ -300,7 +300,7 @@ class RecMachineTest {
         val (mid, _) = reduce(recording(usb(5)), RecEvent.Interrupt(StopReason.MAX_LENGTH))
         val (n, fx) = reduce(mid, RecEvent.Finalized(take(reason = StopReason.MAX_LENGTH)))
         assertEquals(RecState.Armed(usb(5), f(5)), n.state)
-        assertEquals("Stopped at the take limit (0:03.0).", (fx[1] as RecEffect.Say).text)
+        assertEquals("Stopped at the take limit (0:03.0): 30 minutes, or less when phone storage is low.", (fx[1] as RecEffect.Say).text)
     }
 
     @Test fun diskFullKeepsMonitoring() {

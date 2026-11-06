@@ -243,6 +243,41 @@ class CaptureLoopTest {
         assertEquals(882, Rig(s44).loop.chunk)
     }
 
+    @Test fun pollMaxFiresOncePerTakeEvenOnTheSameLoop() {
+        val r = Rig(fake())
+        assertFalse("not while armed", r.loop.pollMax())
+        for (take in 1..3) {
+            r.loop.beginTake(1000)
+            assertFalse(r.loop.pollMax())
+            repeat(5) { r.step() }
+            assertTrue("take $take reached its limit", r.loop.reachedMax)
+            assertTrue("take $take reports it", r.loop.pollMax())
+            repeat(3) { r.step(); assertFalse("but only once", r.loop.pollMax()) }
+            r.loop.endTake()
+            assertFalse(r.loop.pollMax())
+        }
+    }
+
+    @Test fun sinkGetsCopiesNotTheReadBuffer() {
+        var k = 0
+        val src = object : PcmSource {
+            override val rate = 48000; override val channels = 1
+            override val routedId: Int? = null; override val routedName = ""
+            override fun read(dst: ShortArray, frames: Int): Int { k++; dst.fill(k.toShort(), 0, frames); return frames }
+            override fun stopReading() {}
+            override fun close() {}
+        }
+        val r = Rig(src)
+        r.loop.beginTake(1_000_000)
+        repeat(4) { r.step() }
+        assertEquals(4, r.sunk.size)
+        for (i in 0 until 4) {
+            assertEquals("chunk $i keeps the audio it was handed", (i + 1).toShort(), r.sunk[i][0])
+            assertEquals((i + 1).toShort(), r.sunk[i][959])
+            for (j in 0 until i) assertTrue("chunks $i and $j are different arrays", r.sunk[i] !== r.sunk[j])
+        }
+    }
+
     @Test fun stereoFramesAreKeptInterleaved() {
         val r = Rig(fake(FakeSpec(stereo = true)))
         r.loop.beginTake(1_000_000)

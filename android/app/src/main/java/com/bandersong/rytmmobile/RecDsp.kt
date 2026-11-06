@@ -24,6 +24,13 @@ enum class ChannelPick {
                 else -> MIX
             }
         }
+
+        /**
+         * What the L+R / L only / R only row lights: the user's choice, else what chopping the take above will use
+         * (suggest over that take's peaks, exactly as MainActivity.pickFor), else the live suggestion before any take.
+         */
+        fun shown(userPick: ChannelPick?, takePeakDb: List<Float>?, liveHoldDb: List<Float>): ChannelPick =
+            userPick ?: suggest(takePeakDb ?: liveHoldDb)
     }
 }
 
@@ -67,11 +74,15 @@ object Db {
 data class MeterReading(
     val peakDb: List<Float>, val holdDb: List<Float>, val clipped: Boolean, val clipCount: Int,
     val silentMs: Long, val frames: Long, val takeFrames: Long, val rate: Int,
+    val totalClips: Int = 0,             // never reset: take clip counts are differences of this
 ) {
     companion object { val EMPTY = MeterReading(emptyList(), emptyList(), false, 0, 0, 0, 0, 0) }
 }
 
-/** Per-channel peak meter with a fixed release, a peak hold, a latched clip flag and a digital-silence timer. */
+/**
+ * Per-channel peak meter with a fixed release, a peak hold, a latched clip flag and a digital-silence timer.
+ * feed() runs on the capture thread, snapshot() on that thread and on the control thread: one lock covers both.
+ */
 class LevelMeter(
     private val channels: Int, private val rate: Int,
     private val releaseDbPerSec: Float = 24f, private val holdMs: Int = 1500, private val clipAt: Float = 0.999f,
@@ -82,13 +93,15 @@ class LevelMeter(
     private val histDb = ArrayDeque<FloatArray>()
     private var totalFrames = 0L
     private var clipped = false
-    private var clipCount = 0
+    private var clipCount = 0          // since the last resetClip (the CLIPS readout)
+    private var totalClips = 0         // since the input opened
     private var silentMs = 0L
     @Volatile private var clearClip = false
+    private val lock = Any()
 
-    fun feed(inter: ShortArray, frames: Int) {
-        if (clearClip) { clearClip = false; clipped = false }
-        if (frames <= 0) return
+    fun feed(inter: ShortArray, frames: Int) { synchronized(lock) {
+        if (clearClip) { clearClip = false; clipped = false; clipCount = 0 }
+        if (frames <= 0) return@synchronized
         val chunkSec = frames.toFloat() / rate
         val chunkDb = FloatArray(channels)
         var anyClip = false
@@ -108,21 +121,21 @@ class LevelMeter(
             chunkDb[c] = Db.of(lin)
             shown[c] = max(chunkDb[c], shown[c] - releaseDbPerSec * chunkSec)
         }
-        if (anyClip) { clipped = true; clipCount += 1 }
+        if (anyClip) { clipped = true; clipCount += 1; totalClips += 1 }
         silentMs = if (anyNonZero) 0L else silentMs + frames * 1000L / rate
         totalFrames += frames
         histT.addLast(totalFrames); histDb.addLast(chunkDb)
         while (histT.isNotEmpty() && (totalFrames - histT.first()) * 1000L >= holdMs.toLong() * rate) {
             histT.removeFirst(); histDb.removeFirst()
         }
-    }
+    } }
 
-    fun snapshot(takeFrames: Long = 0): MeterReading {
+    fun snapshot(takeFrames: Long = 0): MeterReading = synchronized(lock) {
         val hold = List(channels) { c -> histDb.maxOfOrNull { it[c] } ?: Db.FLOOR }
-        return MeterReading(shown.toList(), hold, clipped, clipCount, silentMs, totalFrames, takeFrames, rate)
+        MeterReading(shown.toList(), hold, clipped, clipCount, silentMs, totalFrames, takeFrames, rate, totalClips)
     }
 
-    /** Thread-safe: consumed on the next feed. */
+    /** Thread-safe: the next feed clears the latched light and the CLIPS count (totalClips keeps counting). */
     fun resetClip() { clearClip = true }
 }
 
@@ -215,7 +228,7 @@ class DropoutCheck(private val rate: Int, private val toleranceMs: Int = 150) {
     private var t0 = 0L
     private var received = 0L
     private var started = false
-    var dropouts: Int = 0; private set
+    @Volatile var dropouts: Int = 0; private set
 
     fun onFrames(n: Int, nowNanos: Long) {
         if (!started) { started = true; t0 = nowNanos - n * 1_000_000_000L / rate; received = 0 }
