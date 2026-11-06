@@ -3,4 +3,6 @@
     <cache-path name="updates" path="updates/" />
     <!-- stems and chops handed to the share sheet -->
     <cache-path name="share" path="share/" />
+    <!-- recorded takes handed to Split and the share sheet -->
+    <files-path name="takes" path="takes/" />
 </paths>

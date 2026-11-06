@@ -192,8 +192,9 @@ object Audio {
         return b.array()
     }
 
-    private var track: AudioTrack? = null
-    fun play(c: Clip) {
+    @Volatile private var track: AudioTrack? = null
+    /** [onDone] runs on the main thread when the clip has played to its end (not when it is stopped). */
+    @Synchronized fun play(c: Clip, onDone: (() -> Unit)? = null) {
         stop()
         val t = AudioTrack.Builder()
             .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
@@ -201,9 +202,16 @@ object Audio {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .setBufferSizeInBytes(maxOf(4, c.data.size * 4)).build()
         t.write(c.data, 0, c.data.size, AudioTrack.WRITE_BLOCKING)
+        if (onDone != null && c.data.isNotEmpty()) {
+            t.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+                override fun onMarkerReached(at: AudioTrack?) { if (track === t) onDone() }
+                override fun onPeriodicNotification(at: AudioTrack?) {}
+            })
+            t.setNotificationMarkerPosition(c.data.size)
+        }
         t.play(); track = t
     }
-    fun stop() { track?.runCatching { stop(); release() }; track = null }
+    @Synchronized fun stop() { track?.runCatching { stop(); release() }; track = null }
 }
 
 class FloatList {
