@@ -58,6 +58,7 @@ fun App(vm: AppState) {
               Column(Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopStart)) {
                 Header(vm, compact)
                 vm.update?.let { UpdateBanner(vm, it) }
+                SupportSlot(vm, compact)
                 AnimatedContent(vm.tab, Modifier.weight(1f), label = "tab",
                     transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) }) { t ->
                     Box(Modifier.fillMaxSize()) {
@@ -153,6 +154,7 @@ private fun RytmScreen(vm: AppState) = Page {
         Text("Patch the Rytm into the phone with a USB‑C OTG cable. Set its USB mode to USB MIDI.", style = T.Body)
         HardButton("Patch in", { vm.connect() }, color = P.Signal, enabled = !vm.busy)
         Text("Rytm Mobile ${BuildConfig.VERSION_NAME}", style = T.Label)
+        SupportEntry(vm)
         if (vm.diag.isNotEmpty()) LogPanel(vm.diag)
         return@Page
     }
@@ -181,6 +183,7 @@ private fun RytmScreen(vm: AppState) = Page {
     if (vm.diag.isNotEmpty()) {
         if (showLog) LogPanel(vm.diag) else GhostButton("Show log", { showLog = true })
     }
+    SupportEntry(vm)
     confirm?.let { e ->
         AlertDialog(
             onDismissRequest = { confirm = null }, containerColor = P.Panel,
