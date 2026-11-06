@@ -16,6 +16,10 @@ android {
         versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_URL", "\"https://rytm-mobile.pages.dev/version.json\"")
+        buildConfigField("String", "SUPPORT_URL", "\"https://rytm-mobile.pages.dev\"")
+        // Off until the founder names the support page: the card must not send people where they cannot chip in.
+        // Turn it on for a build with -PsupportNag=true (SPEC-nag.md section 11, question 2).
+        buildConfigField("boolean", "SUPPORT_NAG", (findProperty("supportNag") == "true").toString())
     }
     val ks = Properties().apply {
         val f = rootProject.file("../release/keystore.properties")
@@ -49,6 +53,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")  // real org.json for JVM tests (android.jar's is a stub)
