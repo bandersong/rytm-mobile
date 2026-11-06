@@ -86,16 +86,20 @@ class AppState(private val ctx: Context) {
     var update by mutableStateOf<Updater.Release?>(null)
     var updateProgress by mutableFloatStateOf(-1f)
     private var lastUpdateCheck = 0L
+    /** True until the first update check answers (and during each later one): the support note waits on it before it spends a card. */
+    var updateChecking by mutableStateOf(true)
     private val updateUrl get() = if (BuildConfig.DEBUG) prefs.getString("update_url", null) ?: BuildConfig.UPDATE_URL else BuildConfig.UPDATE_URL
 
     fun checkUpdate(force: Boolean = false) {
         val now = System.currentTimeMillis()
         if (!force && now - lastUpdateCheck < 6 * 3600_000L) return
         lastUpdateCheck = now
+        updateChecking = true
         scope.launch(Dispatchers.IO) {
             runCatching { Updater.check(updateUrl, BuildConfig.VERSION_CODE) }
                 .onSuccess { update = it }
                 .onFailure { android.util.Log.i("RytmUpdate", "check failed: ${it.message}") }
+            updateChecking = false
         }
     }
 

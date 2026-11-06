@@ -154,8 +154,8 @@ private fun RytmScreen(vm: AppState) = Page {
         Text("Patch the Rytm into the phone with a USB‑C OTG cable. Set its USB mode to USB MIDI.", style = T.Body)
         HardButton("Patch in", { vm.connect() }, color = P.Signal, enabled = !vm.busy)
         Text("Rytm Mobile ${BuildConfig.VERSION_NAME}", style = T.Label)
-        SupportEntry(vm)
         if (vm.diag.isNotEmpty()) LogPanel(vm.diag)
+        SupportEntry(vm)
         return@Page
     }
     var confirm by remember { mutableStateOf<Elektron.Entry?>(null) }

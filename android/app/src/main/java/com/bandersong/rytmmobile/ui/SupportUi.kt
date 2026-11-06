@@ -32,15 +32,15 @@ fun SupportSlot(vm: AppState, compact: Boolean) {
     val note = SupportNote.get(LocalContext.current)
     val m = NagMoment(
         enabled = BuildConfig.SUPPORT_NAG, busy = vm.busy, recording = vm.recordingNow(),
-        updating = vm.updateProgress >= 0f, failed = vm.failed, updateOffered = vm.update != null, cramped = compact,
+        updating = vm.updateProgress >= 0f, failed = vm.failed, updateOffered = vm.update != null, updateChecking = vm.updateChecking, cramped = compact,
     )
     val v = note.verdict(m)
     LaunchedEffect(v) { if (v == NagVerdict.Grant) note.grant(m) }
-    if (v is NagVerdict.Show) SupportCard(note, v.mode)
+    if (v is NagVerdict.Show) SupportCard(note, v.mode, busy = vm.busy)
 }
 
 @Composable
-private fun SupportCard(note: SupportNote, mode: NagMode) {
+private fun SupportCard(note: SupportNote, mode: NagMode, busy: Boolean) {
     val ctx = LocalContext.current
     Box(Modifier.padding(start = 34.dp, end = 18.dp, bottom = 10.dp)) {
         Panel("Support", "free software", accent = P.Signal, trailing = { CloseX { note.later() } }) {
@@ -51,7 +51,7 @@ private fun SupportCard(note: SupportNote, mode: NagMode) {
                     Text(NOTICE_ASK, style = T.Small)
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        HardButton("Support", { note.open(ctx) }, small = true, color = P.Cv)
+                        HardButton("Support", { note.open(ctx) }, small = true, color = P.Cv, enabled = !busy)
                         Spacer(Modifier.width(4.dp))
                         GhostButton("Later", { note.later() })
                     }

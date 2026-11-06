@@ -30,6 +30,7 @@ data class NagMoment(
     val updating: Boolean = false,      // AppState.updateProgress >= 0f: an update is downloading
     val failed: Boolean = false,        // AppState.failed: the status line shows an error
     val updateOffered: Boolean = false, // AppState.update != null: the update banner holds the slot
+    val updateChecking: Boolean = false, // AppState.updateChecking: the update check hasn't answered yet; holds back a grant only
     val cramped: Boolean = false,       // Screens.kt App(): compact
 )
 
@@ -38,7 +39,7 @@ enum class NagMode { NOTICE, AFTER_SUPPORT, THANKS }
 enum class NagWhy {
     UNREADABLE, OFF, BACKGROUND, SUPPORTER, ANSWERED,
     BUSY, RECORDING, UPDATING, FAILED, UPDATE_OFFERED, CRAMPED,
-    FIRST_SESSION, NOT_DUE,
+    FIRST_SESSION, NOT_DUE, UPDATE_CHECKING,
 }
 
 sealed interface NagVerdict {
@@ -75,12 +76,22 @@ class NagPolicy(private val clock: () -> Long) {
         val shownHere = s.impressions > 0 && s.lastShownSession == here
         if (here > 0 && s.closedSession == here) return NagVerdict.Hide(NagWhy.ANSWERED)
         if (here > 0 && s.openedSession == here && !shownHere && !thanking) return NagVerdict.Hide(NagWhy.ANSWERED)
-        quiet(m)?.let { return NagVerdict.Hide(it) }
+        // A card already up stays up through busy: hiding it would move the tab content twice per transfer.
+        quiet(m, cardUp = thanking || shownHere)?.let { return NagVerdict.Hide(it) }
         if (thanking) return NagVerdict.Show(NagMode.THANKS)
-        if (shownHere) return NagVerdict.Show(if (s.openedSession == here) NagMode.AFTER_SUPPORT else NagMode.NOTICE)
+        if (shownHere) {
+            // A clock put right after a jump forward leaves lastSeenAt ahead, so this session can't end: stay quiet then.
+            if (clockBehind(s)) return NagVerdict.Hide(NagWhy.NOT_DUE)
+            return NagVerdict.Show(if (s.openedSession == here) NagMode.AFTER_SUPPORT else NagMode.NOTICE)
+        }
         if (here <= 1) return NagVerdict.Hide(NagWhy.FIRST_SESSION)
-        return if (due(s)) NagVerdict.Grant else NagVerdict.Hide(NagWhy.NOT_DUE)
+        if (!due(s)) return NagVerdict.Hide(NagWhy.NOT_DUE)
+        // Due, but the update check hasn't answered: an update banner would take the slot, so spend nothing yet.
+        return if (m.updateChecking) NagVerdict.Hide(NagWhy.UPDATE_CHECKING) else NagVerdict.Grant
     }
+
+    /** The real clock is well behind the latest time seen: it was set back (or is catching up after a jump forward). */
+    private fun clockBehind(s: NagState): Boolean = clock() < s.lastSeenAt - SESSION_GAP
 
     fun due(s: NagState): Boolean {
         val t = now(s)
@@ -106,8 +117,8 @@ class NagPolicy(private val clock: () -> Long) {
         )
     }
 
-    private fun quiet(m: NagMoment): NagWhy? = when {
-        m.busy -> NagWhy.BUSY
+    private fun quiet(m: NagMoment, cardUp: Boolean): NagWhy? = when {
+        m.busy && !cardUp -> NagWhy.BUSY
         m.recording -> NagWhy.RECORDING
         m.updating -> NagWhy.UPDATING
         m.failed -> NagWhy.FAILED

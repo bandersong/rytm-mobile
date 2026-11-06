@@ -209,11 +209,50 @@ class NagPolicyTest {
         assertEquals(hide(NagWhy.BUSY), firstDue().verdict(NagMoment(busy = true, failed = true, cramped = true)))
     }
 
-    @Test fun busyHidesShownCardAndItReturns() {
+    // A card already up stays up through busy (the layout must not jump on every transfer); busy only holds back a grant.
+    @Test fun busyKeepsShownCardInPlace() {
         val g = p.grant(firstDue())
-        assertEquals(hide(NagWhy.BUSY), g.verdict(NagMoment(busy = true)))
+        assertEquals(show(NagMode.NOTICE), g.verdict(NagMoment(busy = true)))
         assertEquals(show(NagMode.NOTICE), g.verdict())
+        assertEquals(show(NagMode.AFTER_SUPPORT), p.openedSupport(g).verdict(NagMoment(busy = true)))
         assertEquals(1, g.impressions)
+    }
+
+    @Test fun otherQuietFlagsStillHideAShownCardEvenWhenBusy() {
+        val g = p.grant(firstDue())
+        val cases = listOf(
+            NagMoment(busy = true, recording = true) to NagWhy.RECORDING, NagMoment(busy = true, updating = true) to NagWhy.UPDATING,
+            NagMoment(busy = true, failed = true) to NagWhy.FAILED, NagMoment(busy = true, updateOffered = true) to NagWhy.UPDATE_OFFERED,
+            NagMoment(busy = true, cramped = true) to NagWhy.CRAMPED,
+        )
+        for ((m, w) in cases) assertEquals(hide(w), g.verdict(m))
+    }
+
+    @Test fun thanksCardStaysThroughBusyButHidesOnTheOtherQuietFlags() {
+        val thanking = p.supported(p.grant(firstDue()), true)
+        assertEquals(show(NagMode.THANKS), thanking.verdict())
+        assertEquals(show(NagMode.THANKS), thanking.verdict(NagMoment(busy = true)))
+        val cases = listOf(
+            NagMoment(recording = true) to NagWhy.RECORDING, NagMoment(updating = true) to NagWhy.UPDATING,
+            NagMoment(failed = true) to NagWhy.FAILED, NagMoment(updateOffered = true) to NagWhy.UPDATE_OFFERED,
+            NagMoment(cramped = true) to NagWhy.CRAMPED,
+        )
+        for ((m, w) in cases) assertEquals(hide(w), thanking.verdict(m))
+    }
+
+    // ---- Update check
+    @Test fun updateCheckHoldsTheGrantAndSpendsNothing() {
+        val s = firstDue()
+        assertEquals(hide(NagWhy.UPDATE_CHECKING), s.verdict(NagMoment(updateChecking = true)))
+        assertEquals(0, s.impressions)
+        assertEquals(NagVerdict.Grant, s.verdict())
+        // the check found an update: the banner holds the slot and the card stays unspent
+        assertEquals(hide(NagWhy.UPDATE_OFFERED), s.verdict(NagMoment(updateOffered = true)))
+    }
+
+    @Test fun updateCheckDoesNotHideAShownCard() {
+        val g = p.grant(firstDue())
+        assertEquals(show(NagMode.NOTICE), g.verdict(NagMoment(updateChecking = true)))
     }
 
     @Test fun busyAllSessionWaitsForNext() {
@@ -272,11 +311,17 @@ class NagPolicyTest {
         t = T + D
         val r = g.next()
         assertEquals(g.sessions, r.sessions)
-        // Spec asked for NOT_DUE; the card was granted this session and the session did not end, so the verdict is
-        // the granted card again. What matters is that it is not due and never a second Grant.
         assertFalse(p.due(r))
-        assertEquals(show(NagMode.NOTICE), r.verdict())
+        assertEquals(hide(NagWhy.NOT_DUE), r.verdict())
         assertEquals(g.impressions, r.impressions)
+    }
+
+    @Test fun smallClockStepBackDoesNotHideTheCard() {
+        val g = p.grant(firstDue())
+        t += 10 * NagPolicy.MINUTE
+        val seen = p.foreground(p.background(g))
+        t -= 5 * NagPolicy.MINUTE   // a clock correction well inside a session
+        assertEquals(show(NagMode.NOTICE), seen.verdict())
     }
 
     // ---- Cooldown table

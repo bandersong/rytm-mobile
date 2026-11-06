@@ -17,7 +17,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_URL", "\"https://rytm-mobile.pages.dev/version.json\"")
         buildConfigField("String", "SUPPORT_URL", "\"https://rytm-mobile.pages.dev\"")
-        buildConfigField("boolean", "SUPPORT_NAG", "true")
+        // Off until the founder names the support page: the card must not send people where they cannot chip in.
+        // Turn it on for a build with -PsupportNag=true (SPEC-nag.md section 11, question 2).
+        buildConfigField("boolean", "SUPPORT_NAG", (findProperty("supportNag") == "true").toString())
     }
     val ks = Properties().apply {
         val f = rootProject.file("../release/keystore.properties")
