@@ -201,7 +201,7 @@ pre {
   content: attr(data-silk); display: block; font-family: var(--font-display); text-transform: uppercase;
   letter-spacing: .14em; font-size: .75rem; font-weight: 700; color: var(--muted); margin: 0 0 4px;
 }
-.term pre { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.term pre { margin: 0 0 8px; white-space: pre; overflow-x: auto; color: var(--ink); }
 .term .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 
 /* ---------- callouts, lists ---------- */
@@ -282,9 +282,14 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 719px) {
+  .module-head { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 4px; align-items: center; }
+  .module-head .tag { grid-column: 2; }
   .flow .wide { display: none; }
   .flow .tall { display: block; max-width: 26rem; }
   .btn-big { width: 100%; font-size: var(--text-l); padding: 12px 18px; }
+}
+@media (min-width: 350px) {
+  .module-body code { white-space: nowrap; }
 }
 @media (min-width: 720px) {
   main { padding-left: max(52px, env(safe-area-inset-left)); }
