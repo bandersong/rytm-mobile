@@ -1,5 +1,7 @@
 package com.bandersong.rytmmobile.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
@@ -67,8 +70,8 @@ fun App(vm: AppState) {
               }
             }
         }
-        PatchBay(SECTIONS, vm.tab, { vm.tab = it },
-            lit = listOf(vm.link != null, vm.clip != null, vm.job?.status == "done"))
+        PatchBay(SECTIONS, vm.tab, { if (!vm.capturing) vm.tab = it },
+            lit = listOf(vm.link != null, vm.clip != null || vm.recModel.open, vm.job?.status == "done"))
     }
 }
 
@@ -93,7 +96,7 @@ private fun Header(vm: AppState, compact: Boolean) {
     }
     Column(Modifier.padding(start = 34.dp, end = 18.dp, top = 14.dp, bottom = 10.dp)) {
         Box {
-            Kicker("Rytm Mobile · " + when (vm.tab) { 0 -> "+Drive transfer"; 1 -> "trim and send"; else -> "stem separation" }, color)
+            Kicker("Rytm Mobile · " + when (vm.tab) { 0 -> "+Drive transfer"; 1 -> "record, trim and send"; else -> "stem separation" }, color)
         }
         Spacer(Modifier.height(6.dp))
         Box {
@@ -238,16 +241,38 @@ private fun LogPanel(log: String) {
 /* ───────────────────────────── CHOP ───────────────────────────── */
 
 @Composable
-private fun ChopScreen(vm: AppState) = Page {
+private fun ChopScreen(vm: AppState) {
+    val act = LocalContext.current.findActivity()
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(vm::load) }
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        vm.onMicPermission(ok, act.shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) }
+    val record: () -> Unit = {
+        val granted = act.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val rationale = !granted && act.shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
+        vm.openRecorder(granted, rationale)
+        if (!granted && !rationale) mic.launch(Manifest.permission.RECORD_AUDIO)
+    }
+    val askAgain: () -> Unit = { vm.askMicAgain(); mic.launch(Manifest.permission.RECORD_AUDIO) }
+    DisposableEffect(Unit) { onDispose { vm.closeRecorder() } }     // leaving Chop releases the mic (ignored while capturing)
+    if (vm.recModel.open) RecorderScreen(vm, askAgain, onOpenFile = { vm.closeRecorder(); pick.launch(MEDIA) })
+    else ChopEditor(vm, record) { pick.launch(MEDIA) }
+}
+
+@Composable
+private fun ChopEditor(vm: AppState, onRecord: () -> Unit, onOpen: () -> Unit) = Page {
     val c = vm.clip
     if (c == null) {
         EmptyWave()
-        Text("Any audio or video: MP3, WAV, M4A, FLAC, screen recordings, voice memos. It comes out 48 kHz, 16‑bit mono, the Rytm's native format.", style = T.Body)
-        HardButton("Open audio or video", { pick.launch(MEDIA) }, enabled = !vm.busy)
+        Text("Record from the phone mic or a USB mic or audio interface, or open any audio or video: MP3, WAV, M4A, FLAC, screen recordings, voice memos. It comes out 48 kHz, 16‑bit mono, the Rytm's native format.", style = T.Body)
+        HardButton("Record", onRecord, color = P.Signal, enabled = !vm.busy)
+        HardButton("Open audio or video", onOpen, enabled = !vm.busy)
         return@Page
     }
-    Panel("Sample", "48k mono", accent = P.Cv, trailing = { GhostButton("Open", { pick.launch(MEDIA) }, enabled = !vm.busy) }) {
+    Panel("Sample", "48k mono", accent = P.Cv, trailing = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            GhostButton("Rec", onRecord, color = P.Signal, enabled = !vm.busy); Spacer(Modifier.width(6.dp)); GhostButton("Open", onOpen, enabled = !vm.busy)
+        }
+    }) {
         Field("Name on Rytm", vm.clipName, { vm.clipName = AppState.clean(it) })
         Spacer(Modifier.height(14.dp))
         Wave(c, vm.start, vm.end) { s, e -> vm.start = s; vm.end = e }
@@ -266,7 +291,7 @@ private fun ChopScreen(vm: AppState) = Page {
         }
         Spacer(Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HardButton("Play", { vm.prepared()?.let(Audio::play) }, small = true, color = P.Ink)
+            HardButton("Play", { runCatching { vm.prepared()?.let(Audio::play) }.onFailure { vm.status = "Error: this clip is too long to play here. Trim it first." } }, small = true, color = P.Ink)
             Spacer(Modifier.width(8.dp))
             GhostButton("Stop", { Audio.stop() })
         }
@@ -289,7 +314,7 @@ private fun ChopScreen(vm: AppState) = Page {
 }
 
 @Composable
-private fun Readout(label: String, value: String, modifier: Modifier) = Column(modifier) {
+internal fun Readout(label: String, value: String, modifier: Modifier) = Column(modifier) {
     Text(label.uppercase(), style = T.Label.copy(fontSize = 10.sp)); Text(value, style = T.Data.copy(fontSize = 15.sp))
 }
 
@@ -423,6 +448,18 @@ private fun SplitScreen(vm: AppState) = Page {
     }
     HardButton("Pick track or video", { pick.launch(MEDIA) }, color = P.Audio, enabled = !vm.busy)
     if (vm.jobId != null && vm.job == null) GhostButton("Resume last job", { vm.resume() }, color = P.Audio, enabled = !vm.busy)
+    val takes by vm.rec.takes.collectAsState()
+    if (takes.isNotEmpty()) Panel("Takes", "recorded on this phone", accent = P.Audio) {
+        takes.take(3).forEach { t ->
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                Jack(P.Audio, false, 18.dp); Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) { Text(t.id, style = T.Title.copy(fontSize = 17.sp))
+                    Text("${Clock.of(t.seconds)} · ${t.inputName}", style = T.Small, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                GhostButton("Split", { vm.splitTake(t) }, color = P.Audio, enabled = !vm.busy, tall = true)
+            }
+        }
+        Text("Record new takes in Chop.", style = T.Label)
+    }
 
     val j = vm.job
     if (j != null && j.status != "done" && j.status != "error") SignalPath(j.status)

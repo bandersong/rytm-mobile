@@ -2,8 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.software.midi" android:required="true" />
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application android:label="Rytm Mobile" android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.NoActionBar" android:icon="@mipmap/ic_launcher">
         <activity android:name=".MainActivity" android:exported="true"

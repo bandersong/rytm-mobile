@@ -1,7 +1,9 @@
 package com.bandersong.rytmmobile
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -49,8 +51,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() { super.onResume(); vm.checkUpdate() }
 
+    override fun onStart() { super.onStart()
+        vm.onHostStarted(checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+            shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) }
+    override fun onStop() { super.onStop(); vm.onHostStopped() }
+
     private fun handleIntent(i: Intent?) {
         i?.getStringExtra("update_url")?.let { vm.setUpdateUrl(it) }  // debug builds only (ignored in release)
+        if (BuildConfig.DEBUG) i?.getStringExtra("rec_fake")?.let { vm.rec.setFake(if (it == "off") null else FakeSpec.parse(it)) }
         if (i?.action == Intent.ACTION_SEND) {
             @Suppress("DEPRECATION")
             (i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let { vm.load(it) }
@@ -81,6 +89,21 @@ class AppState(private val ctx: Context) {
     var normalize by mutableStateOf(true)
     var fades by mutableStateOf(true)
     var tab by mutableIntStateOf(0)
+
+    // Recording (Recorder.kt): the engine owns the mic and its threads; Compose reads this mirror.
+    val rec = RecorderEngine(ctx, prefs)
+    var recModel by mutableStateOf(RecModel())
+    val capturing get() = recModel.capturing
+    private var pendingConnect = false
+    var autoTrim by mutableStateOf(prefs.getBoolean("autoTrim", true))
+    var recPick by mutableStateOf<ChannelPick?>(null)          // null = ChannelPick.suggest per take
+    init {
+        scope.launch { rec.model.collect { m ->
+            val was = recModel.capturing; recModel = m
+            if (was && !m.capturing && pendingConnect) { pendingConnect = false; if (link == null) connect() }
+        } }
+        scope.launch { rec.notice.collect { n -> if (n != null) status = n.text } }
+    }
 
     // Self-update (see Updater). Checked at launch and when the app comes back, at most every 6 h.
     var update by mutableStateOf<Updater.Release?>(null)
@@ -154,6 +177,7 @@ class AppState(private val ctx: Context) {
 
     private fun task(label: String, block: suspend CoroutineScope.() -> Unit) {
         if (busy) return
+        if (capturing) { status = "Stop recording first."; return }
         busy = true; progress = 0f; status = label
         scope.launch {
             try { withContext(Dispatchers.IO, block) } catch (e: Exception) {
@@ -175,11 +199,14 @@ class AppState(private val ctx: Context) {
         return l
     }
 
-    fun connect() = task("Looking for the Rytm…") {
-        diag = ""
-        val l = openLink()
-        status = "Connected: ${l.name} ${l.version}"
-        entries = l.list(dir)
+    fun connect() {
+        if (capturing) { pendingConnect = true; logLine("Rytm plugged in during a take; connecting when it ends"); return }
+        task("Looking for the Rytm…") {
+            diag = ""
+            val l = openLink()
+            status = "Connected: ${l.name} ${l.version}"
+            entries = l.list(dir)
+        }
     }
 
     /**
@@ -237,12 +264,14 @@ class AppState(private val ctx: Context) {
         val r = Audio.resample(c)
         clip = r; clipName = clean(StemClient.displayName(ctx, uri).substringBeforeLast('.'))
         start = 0f; end = 1f; tab = 1
+        rec.close()
         status = "Loaded ${"%.1f".format(r.seconds)} s"
     }
 
     private fun loadFile(f: File, name: String) {
         val c = Audio.resample(Audio.decode(f))
         clip = c; clipName = clean(name); start = 0f; end = 1f
+        rec.close()
     }
 
     fun prepared(): Clip? = clip?.let { Audio.prepare(it, start * it.seconds, end * it.seconds, normalize, fades) }
@@ -277,10 +306,61 @@ class AppState(private val ctx: Context) {
         status = "Sent $path (${"%.1f".format(c.seconds)} s in ${(System.currentTimeMillis() - t0) / 1000} s)"
     }
 
+    // --- Recording: what the recorder screen calls ---------------------------------------------------------------
+    fun openRecorder(granted: Boolean, rationale: Boolean) { Audio.stop(); rec.show(granted, rationale) }
+    fun onMicPermission(granted: Boolean, rationale: Boolean) = rec.permissionResult(granted, rationale)
+    fun askMicAgain() = rec.askAgain()
+    fun retryRecorder() = rec.retry()
+    fun closeRecorder() = rec.close()
+    fun selectInput(key: String) = rec.pick(key)
+    fun resetClipLight() = rec.resetClip()
+    fun toggleRec() = when (recModel.state) { is RecState.Recording -> rec.stop(); is RecState.Armed -> { Audio.stop(); rec.rec() }; else -> Unit }
+    fun onHostStarted(granted: Boolean, rationale: Boolean) = rec.hostStarted(granted, rationale)
+    fun onHostStopped() = rec.hostStopped()
+    fun setAutoTrimPref(on: Boolean) { autoTrim = on; prefs.edit().putBoolean("autoTrim", on).apply() }
+    private fun pickFor(t: Take) = recPick ?: ChannelPick.suggest(t.peakDb)
+    private fun chopFits(t: Take): Boolean { val rt = Runtime.getRuntime()
+        return ChopBudget.fits(t.frames, t.rate, rt.maxMemory(), rt.totalMemory() - rt.freeMemory() - (clip?.data?.size ?: 0) * 4L) }
+
+    fun useTake(t: Take) = task("Loading ${t.id}…") {
+        if (!chopFits(t)) throw Exception("${t.id} (${Clock.of(t.seconds)}) is too long to chop on this phone. Split it, or record a shorter take.")
+        clip = null
+        val c = WavIo.readMono(t.file, pickFor(t))
+        status = "Resampling ${c.rate} Hz → 48 kHz…"
+        val r = Audio.resample(c)
+        val (s, e) = if (autoTrim) Trim.soundBounds(r.data, r.rate) else 0f to 1f
+        clip = r; clipName = clean(t.id); start = s; end = e; tab = 1
+        rec.close()
+        status = "Loaded ${t.id} ${"%.1f".format(r.seconds)} s"
+    }
+    fun listenTake(t: Take) = task("Loading ${t.id} to listen…") {
+        if (!chopFits(t)) throw Exception("${t.id} is too long to play here. Chop it or split it.")
+        val c = WavIo.readMono(t.file, pickFor(t))
+        withContext(Dispatchers.Main) { Audio.play(c) }
+        status = "Playing ${t.id}"
+    }
+    fun saveTake(t: Take) = task("Saving ${t.id}…") {
+        val uri = Saver.saveAudio(ctx, t.file, "Recordings", "${t.id}.wav", StemFormat.WAV.mime, replace = true)
+        rec.markSaved(t, uri.toString())
+        status = "Saved ${StemClient.displayName(ctx, uri)} to ${Saver.MUSIC_DIR}/Recordings"
+    }
+    fun shareTake(t: Take) {
+        runCatching { Saver.share(ctx, t.file, StemFormat.WAV.mime, "Share ${t.id}") }
+            .onFailure { status = "Error: " + (it.message ?: "couldn't share ${t.id}") }
+    }
+    fun splitTake(t: Take) {
+        if (capturing) return
+        rec.close(); tab = 2
+        if (models.isEmpty()) { status = "Pair your computer here first, then tap Split on the take again."; return }
+        separate(androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".updates", t.file))
+    }
+    fun deleteTake(t: Take) = rec.deleteTake(t)
+
     private fun client(): StemClient = StemClient(serverUrl(server) ?: throw Exception(BAD_SERVER), token)
 
     /** rytmmobile://pair?url=http%3A%2F%2F100.x.y.z%3A8765&token=… from the installer's QR code. */
     fun pair(uri: Uri) {
+        if (capturing) { status = "Stop recording first, then open the pairing link again."; return }
         tab = 2
         val u = uri.getQueryParameter("url")?.trim(); val t = uri.getQueryParameter("token")?.trim()
         if (u.isNullOrBlank() || t.isNullOrBlank()) {

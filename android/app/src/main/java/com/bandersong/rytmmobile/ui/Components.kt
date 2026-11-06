@@ -25,6 +25,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -93,11 +96,53 @@ fun HardButton(
 
 /** Flat outlined chip button, for secondary actions. */
 @Composable
-fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = P.Ink, enabled: Boolean = true) {
+fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = P.Ink, enabled: Boolean = true, tall: Boolean = false) {
     Box(
         modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, if (enabled) color.copy(alpha = .55f) else P.Line, RoundedCornerShape(3.dp))
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp)
+            .then(if (tall) Modifier.heightIn(min = 48.dp) else Modifier)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
     ) { Text(text.uppercase(), style = T.Label.copy(color = if (enabled) color else P.Line)) }
+}
+
+/** The record button: HardButton's shadow and press, full width, with a dot (idle) or square (recording) glyph. No haptics: the phone mic would hear them. */
+@Composable
+fun RecButton(
+    recording: Boolean, enabled: Boolean, label: String, onClick: () -> Unit,
+    modifier: Modifier = Modifier, height: Dp = 72.dp,
+) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val depth = 4.dp
+    val off by animateDpAsState(if (pressed && enabled) 0.dp else depth, tween(60), label = "recpress")
+    val shape = RoundedCornerShape(50)
+    val t = rememberInfiniteTransition(label = "recblink")
+    val blink by t.animateFloat(1f, .25f, infiniteRepeatable(tween(450), RepeatMode.Reverse), label = "recglyph")
+    Box(modifier.fillMaxWidth().height(height).padding(end = depth, bottom = depth)) {
+        Box(Modifier.matchParentSize().offset(depth, depth).clip(shape).background(P.Shade))
+        Box(
+            Modifier.fillMaxSize().offset(depth - off, depth - off).clip(shape)
+                .background(if (enabled) P.Signal else P.Well)
+                .border(2.dp, P.Shade, shape)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = if (recording) "Stop recording" else "Start recording"
+                    stateDescription = if (recording) "Recording" else "Ready"
+                }
+                .clickable(src, null, enabled = enabled, role = Role.Button, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val ink = if (enabled) P.Bg else P.Muted
+                Canvas(Modifier.size(18.dp)) {
+                    val c = ink.copy(alpha = if (recording) blink else 1f)
+                    if (recording) drawRoundRect(c, Offset.Zero, size, CornerRadius(3.dp.toPx()))
+                    else drawCircle(c, size.minDimension / 2, center)
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(label.uppercase(), style = T.Button.copy(color = ink, fontSize = androidx.compose.ui.unit.TextUnit(22f, androidx.compose.ui.unit.TextUnitType.Sp)), maxLines = 1)
+            }
+        }
+    }
 }
 
 /** A 3.5mm jack socket. lit = something is patched in. */
