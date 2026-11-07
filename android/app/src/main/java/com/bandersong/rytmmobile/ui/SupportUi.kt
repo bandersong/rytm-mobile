@@ -77,6 +77,8 @@ private fun SupportCard(note: SupportNote, mode: NagMode, busy: Boolean) {
 /** The always-there way in: an About panel at the foot of the Rytm tab, connected or not. */
 @Composable
 fun SupportEntry(vm: AppState) {
+    // Ships dark until the founder picks a support page: no button that leads nowhere.
+    if (!BuildConfig.SUPPORT_NAG) return
     val ctx = LocalContext.current
     val note = SupportNote.get(ctx)
     Panel("About", "free software · GPL‑3.0", accent = P.Signal) {

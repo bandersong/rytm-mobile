@@ -25,7 +25,7 @@ Known limits:
 - Recordings are 16-bit WAV, at 48 kHz when the input allows it.
 - Takes can be up to 30 minutes (the stem server's split limit). How long a take you can chop depends on the phone's memory; a longer take can be split instead.
 - Bluetooth microphones aren't offered.
-- With the phone mic, the tap on REC can be heard at the start. Auto-trim usually removes it.
+- With the phone mic, the tap on REC can be heard at the start. Auto-trim only cuts silence below -50 dBFS at either end, so an audible tap stays; trim it by hand on the waveform.
 - A phone call or another recording app takes the microphone. The take stops and is kept.
 - The Android emulator can't record audio.
 
