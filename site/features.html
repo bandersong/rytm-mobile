@@ -418,7 +418,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
     <li><a href="#overview"><span class="jack" aria-hidden="true"></span>Overview</a></li>
     <li><a href="#rytm"><span class="jack" aria-hidden="true"></span>Rytm</a></li>
     <li><a href="#chop"><span class="jack" aria-hidden="true"></span>Chop</a></li>
-    <!-- UNMERGED:record --><li><a href="#record"><span class="jack" aria-hidden="true"></span>Record</a></li><!-- /UNMERGED:record -->
+    <li><a href="#record"><span class="jack" aria-hidden="true"></span>Record</a></li>
     <li><a href="#split"><span class="jack" aria-hidden="true"></span>Split</a></li>
     <li><a href="#computer"><span class="jack" aria-hidden="true"></span>Your computer</a></li>
     <li><a href="#updates"><span class="jack" aria-hidden="true"></span>Updates</a></li>
@@ -438,7 +438,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
     <div class="module-head"><span class="jack" aria-hidden="true"></span><h2 id="h-overview">Overview</h2><span class="tag">signal path</span></div>
     <div class="module-body">
       <p data-c="C075">Rytm Mobile has three tabs, Rytm, Chop and Split, on a bottom bar drawn as a patch bay: a jack for each tab, with a cable plugged into the one you're on.</p>
-      <p data-c="C076">A jack lights up when its tab has something going: the Rytm is connected, a sample is loaded, or a split is done.</p>
+      <p data-c="C076">A jack lights up when its tab has something going: the Rytm is connected, a sample is loaded or the recorder is open, or a split is done.</p>
       <p data-c="C077">The app keeps your sample and the USB link when you rotate or fold the phone.</p>
       <p data-c="C078">One job runs at a time. The status line under the title says what's happening, with a 16‑step progress bar; errors turn it red.</p>
       <figure class="flow" data-cref="C079">
@@ -524,7 +524,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
             <tr data-cref="C116 C129 C133 C137"><td data-label="Feature">Split, save stems, zip, History</td><td data-label="Needs"><span class="chip pub">Phone</span><span class="chip host">Your computer</span></td></tr>
             <tr data-cref="C136"><td data-label="Feature">Send all stems</td><td data-label="Needs"><span class="chip pub">Phone</span><span class="chip host">Your computer</span><span class="chip eph">Rytm + OTG cable</span></td></tr>
             <tr data-cref="C149"><td data-label="Feature">Updates</td><td data-label="Needs"><span class="chip pub">Phone</span> and an internet connection</td></tr>
-            <!-- UNMERGED:record --><tr data-cref="C114"><td data-label="Feature">Record</td><td data-label="Needs"><span class="chip pub">Phone</span> and its mic or a USB audio input</td></tr><!-- /UNMERGED:record -->
+            <tr data-cref="C114"><td data-label="Feature">Record</td><td data-label="Needs"><span class="chip pub">Phone</span> and its mic or a USB audio input</td></tr>
           </tbody>
         </table>
       </div>
@@ -676,12 +676,13 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
     </div>
   </section>
 
-  <!-- UNMERGED:record -->
+  <!-- ===================== RECORD ===================== -->
   <section class="module" id="record" aria-labelledby="h-record">
     <div class="module-head"><span class="jack j-cv" aria-hidden="true"></span><h2 id="h-record">Record</h2><span class="tag">mic or USB audio</span></div>
     <div class="module-body">
-      <p data-c="C114">Record straight into the phone, from its own microphone or from a USB audio input.</p>
-      <p data-c="C115">Then the recording goes through the whole process like any other sound: chop it, split it, save it, or send it to the Rytm.</p>
+      <p data-c="C114">The recorder opens from the Chop tab, with <b>Record</b> or, once a sample is loaded, <b>Rec</b>. It records from the phone's own mic, a wired headset mic, or a USB mic or audio interface.</p>
+      <p data-c="C115">After a take, its card offers <b>Chop it</b> (trim it in Chop, then send it to the Rytm), <b>Listen</b>, <b>Save</b> (a copy in Music/Rytm Mobile/Recordings), <b>Share</b> and <b>Split</b> (stems on your computer).</p>
+      <p data-c="C165">Takes stay on the phone until you delete them. Any take in the list can be chopped, and the Split tab lists the latest three.</p>
       <figure class="flow" data-cref="C114 C115">
         <svg class="wide" viewBox="0 0 620 200" role="img" aria-labelledby="f6w-t">
         <title id="f6w-t">Record: the mic or a USB audio input goes into Record. A take goes on to Chop, where Send puts it on the Rytm, to Split, or to the phone with Save and Share.</title>
@@ -733,9 +734,30 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
         </svg>
         <figcaption>From the mic or a USB audio input, through Record, on to Chop or Split like any other sound, or saved and shared as recorded.</figcaption>
       </figure>
+
+      <h3>Inputs</h3>
+      <ul>
+        <li data-c="C166">The phone's mic and a headset mic record in mono.</li>
+        <li data-c="C167">A USB mic or audio interface is tried in stereo first when it offers two channels, then in mono, at 48 kHz and then 44.1 kHz. The app records at most two channels.</li>
+        <li data-c="C168">Class‑compliant USB mics and audio interfaces are the target. Some USB Audio Class 2‑only interfaces may not work.</li>
+        <li data-c="C169">With a stereo input, <b>L+R</b>, <b>L only</b> or <b>R only</b> picks what Chop and Listen use. The take keeps both channels.</li>
+        <li data-c="C170">Bluetooth mics aren't offered.</li>
+        <li data-c="C171">The Rytm MK1's USB port carries MIDI only, so the Rytm itself isn't a USB audio input. To record it, patch its Main Out or Headphones into a USB interface.</li>
+        <li data-c="C172">The phone has one USB‑C port. To keep the Rytm plugged in while you record from a USB interface you need a powered USB hub, which hasn't been tried with the app yet; or record first, then plug the Rytm back in.</li>
+      </ul>
+
+      <h3>Takes</h3>
+      <ul>
+        <li data-c="C173">The meter shows the level before you record, and nothing is kept until you tap <b>REC</b>. The take then starts with up to half a second from before the tap, so it never starts late.</li>
+        <li data-c="C174">Takes are 16‑bit WAV, at 48 kHz when the input allows it. A take can run up to 30 minutes, or less when phone storage is low.</li>
+        <li data-c="C175">Recording runs only while Rytm Mobile is on screen, and the screen stays on while the mic is open. Leave the app or lock the phone and the take stops; what was recorded is kept. The same goes for a call or another app taking the mic, unplugging the input, or full storage.</li>
+        <li data-c="C176">While a take is recording, the tabs don't switch.</li>
+        <li data-c="C177">How long a take Chop can open depends on the phone's memory; a longer take can still be split.</li>
+        <li data-c="C178"><b>Auto‑trim</b>, on by default, sets Chop's handles around the sound when you chop a take, cutting the silence at either end.</li>
+      </ul>
+      <p data-c="C179">Rytm Mobile listens only while the recorder is open. Opening, chopping, sending and splitting files all work without microphone access.</p>
     </div>
   </section>
-  <!-- /UNMERGED:record -->
 
   <!-- ===================== SPLIT ===================== -->
   <section class="module" id="split" aria-labelledby="h-split">
@@ -933,7 +955,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
             <tr data-c="C158"><td data-label="Platform">Stem server on Apple‑silicon Macs, Intel Macs and Ubuntu 24.04</td><td data-label="Status">Tested</td></tr>
             <tr data-c="C159"><td data-label="Platform">Analog Rytm MKII</td><td data-label="Status">Not tested (the protocol is the same in Elektroid)</td></tr>
             <tr data-c="C160"><td data-label="Platform">NVIDIA GPUs</td><td data-label="Status">Not tested</td></tr>
-            <!-- UNMERGED:record --><tr data-c="C164"><td data-label="Platform">Recording (phone mic, USB audio)</td><td data-label="Status">Not yet tested on hardware</td></tr><!-- /UNMERGED:record -->
+            <tr data-c="C164"><td data-label="Platform">Recording (phone mic, USB audio)</td><td data-label="Status">Not yet tested on hardware</td></tr>
           </tbody>
         </table>
       </div>
@@ -944,7 +966,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
         <li data-c="C089"><span class="case">Folders stay put.</span> Folders can't be deleted or renamed from the app, and samples can't be renamed.</li>
         <li data-c="C066"><span class="case">Plain HTTP at home.</span> The phone talks to the stem server over plain HTTP, with the token on every request. Use it on your own Wi‑Fi or over Tailscale.</li>
         <li data-c="C021"><span class="case">Phone.</span> Android 10 or newer, on a phone with USB host and MIDI support.</li>
-        <li data-c="C161"><span class="case">Permissions:</span> network access, and permission to install its own updates.<!-- UNMERGED:record --> Recording also asks to use the microphone.<!-- /UNMERGED:record --></li>
+        <li data-c="C161"><span class="case">Permissions:</span> network access, and permission to install its own updates. Recording also asks to use the microphone.</li>
       </ul>
 
       <h3>Under the hood</h3>
