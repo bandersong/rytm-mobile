@@ -150,7 +150,7 @@ li { margin-bottom: .35rem; max-width: 65ch; }
   border-bottom: 2px solid var(--ink);
   padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left));
 }
-.nav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+.nav ul { list-style: none; margin: 0; padding: 5px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; } /* 5px = focus ring 3px + offset 2px, inside the scroller */
 .nav li { margin: 0; flex: 0 0 auto; max-width: none; }
 .nav a {
   display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 10px;
@@ -284,6 +284,9 @@ td .chip { margin: 0 4px 4px 0; }
 .bi { fill: var(--signal); }
 .bo { fill: var(--muted); }
 .ov { fill: var(--shade); opacity: .55; }
+/* Dark: the app darkens the cut ends with its near-black Shade (#0b0f10); lightening them would invert the view. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ov { fill: #0b0f10; } }
+:root[data-theme="dark"] .ov { fill: #0b0f10; }
 .hd { stroke: var(--cv); stroke-width: 3; }
 .tab { fill: var(--cv); stroke: var(--ink); stroke-width: 1.5; }
 .wl { font-size: 13px; fill: var(--ink); }
@@ -383,6 +386,15 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
       }, { rootMargin: '-20% 0px -70% 0px' });
       Array.prototype.forEach.call(document.querySelectorAll('main > section.module'), function (s) { io.observe(s); });
     }
+
+    /* Below 1000px the section links scroll sideways, and Chrome leaves a link that is only partly in view where it is
+       when it takes focus. Bring the focused link, and its 5px focus ring, fully into view. */
+    var navUl = document.querySelector('.nav ul');
+    if (navUl) navUl.addEventListener('focusin', function (e) {
+      var r = e.target.getBoundingClientRect(), u = navUl.getBoundingClientRect(), pad = 5;
+      if (r.left < u.left + pad) navUl.scrollLeft -= (u.left + pad - r.left);
+      else if (r.right > u.right - pad) navUl.scrollLeft += (r.right - (u.right - pad));
+    });
   });
 })();
 </script>
@@ -673,42 +685,42 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
       <p data-c="C115">Then the recording goes through the whole process like any other sound: chop it, split it, save it, or send it to the Rytm.</p>
       <figure class="flow" data-cref="C114 C115">
         <svg class="wide" viewBox="0 0 620 200" role="img" aria-labelledby="f6w-t">
-        <title id="f6w-t">Record: the mic or a USB audio input goes into Record, and the recording goes on to Chop, Split or the Rytm.</title>
+        <title id="f6w-t">Record: the mic or a USB audio input goes into Record. A take goes on to Chop, where Send puts it on the Rytm, to Split, or to the phone with Save and Share.</title>
         <rect class="mod" x="10" y="20" width="160" height="60" rx="4"/><text class="t" x="24" y="46">Mic</text><text class="s" x="24" y="66">on the phone</text>
         <rect class="mod" x="10" y="120" width="160" height="60" rx="4"/><text class="t" x="24" y="146">USB audio in</text><text class="s" x="24" y="166">interface</text>
         <rect class="mod" x="250" y="70" width="140" height="60" rx="4"/><text class="t" x="264" y="96">Record</text><text class="s" x="264" y="116">into the phone</text>
-        <rect class="mod" x="470" y="10" width="140" height="50" rx="4"/><text class="t" x="484" y="31">Chop</text><text class="s" x="484" y="51">trim</text>
+        <rect class="mod" x="470" y="10" width="140" height="50" rx="4"/><text class="t" x="484" y="31">Chop</text><text class="s" x="484" y="51">trim, send</text>
         <rect class="mod" x="470" y="75" width="140" height="50" rx="4"/><text class="t" x="484" y="96">Split</text><text class="s" x="484" y="116">stems</text>
-        <rect class="mod" x="470" y="140" width="140" height="50" rx="4"/><text class="t" x="484" y="161">Rytm</text><text class="s" x="484" y="181">send</text>
+        <rect class="mod" x="470" y="140" width="140" height="50" rx="4"/><text class="t" x="484" y="161">Phone</text><text class="s" x="484" y="181">save, share</text>
         <path class="cab c" d="M170 50 C 210 50, 210 92, 250 92"/>
         <path class="cab c" d="M170 150 C 210 150, 210 108, 250 108"/>
-        <path class="cab c" d="M390 92 C 430 92, 430 35, 470 35"/>
+        <path class="cab c" d="M390 84 C 430 84, 430 35, 470 35"/>
         <path class="cab a" d="M390 100 C 420 100, 440 100, 470 100"/>
-        <path class="cab s" d="M390 108 C 430 108, 430 165, 470 165"/>
+        <path class="cab n" d="M390 116 C 430 116, 430 165, 470 165"/>
         <g><circle class="jk" cx="170" cy="50" r="7"/><circle class="hole" cx="170" cy="50" r="3"/><circle class="plug c" cx="170" cy="50" r="5"/></g>
         <g><circle class="jk" cx="170" cy="150" r="7"/><circle class="hole" cx="170" cy="150" r="3"/><circle class="plug c" cx="170" cy="150" r="5"/></g>
         <g><circle class="jk" cx="250" cy="92" r="7"/><circle class="hole" cx="250" cy="92" r="3"/><circle class="plug c" cx="250" cy="92" r="5"/></g>
         <g><circle class="jk" cx="250" cy="108" r="7"/><circle class="hole" cx="250" cy="108" r="3"/><circle class="plug c" cx="250" cy="108" r="5"/></g>
-        <g><circle class="jk" cx="390" cy="92" r="7"/><circle class="hole" cx="390" cy="92" r="3"/><circle class="plug c" cx="390" cy="92" r="5"/></g>
+        <g><circle class="jk" cx="390" cy="84" r="7"/><circle class="hole" cx="390" cy="84" r="3"/><circle class="plug c" cx="390" cy="84" r="5"/></g>
         <g><circle class="jk" cx="470" cy="35" r="7"/><circle class="hole" cx="470" cy="35" r="3"/><circle class="plug c" cx="470" cy="35" r="5"/></g>
         <g><circle class="jk" cx="390" cy="100" r="7"/><circle class="hole" cx="390" cy="100" r="3"/><circle class="plug a" cx="390" cy="100" r="5"/></g>
         <g><circle class="jk" cx="470" cy="100" r="7"/><circle class="hole" cx="470" cy="100" r="3"/><circle class="plug a" cx="470" cy="100" r="5"/></g>
-        <g><circle class="jk" cx="390" cy="108" r="7"/><circle class="hole" cx="390" cy="108" r="3"/><circle class="plug s" cx="390" cy="108" r="5"/></g>
-        <g><circle class="jk" cx="470" cy="165" r="7"/><circle class="hole" cx="470" cy="165" r="3"/><circle class="plug s" cx="470" cy="165" r="5"/></g>
+        <g><circle class="jk" cx="390" cy="116" r="7"/><circle class="hole" cx="390" cy="116" r="3"/><circle class="plug n" cx="390" cy="116" r="5"/></g>
+        <g><circle class="jk" cx="470" cy="165" r="7"/><circle class="hole" cx="470" cy="165" r="3"/><circle class="plug n" cx="470" cy="165" r="5"/></g>
         </svg>
         <svg class="tall" viewBox="0 0 340 300" role="img" aria-labelledby="f6t-t">
-        <title id="f6t-t">Record: the mic or a USB audio input goes into Record, and the recording goes on to Chop, Split or the Rytm.</title>
+        <title id="f6t-t">Record: the mic or a USB audio input goes into Record. A take goes on to Chop, where Send puts it on the Rytm, to Split, or to the phone with Save and Share.</title>
         <rect class="mod" x="10" y="10" width="150" height="56" rx="4"/><text class="t" x="24" y="34">Mic</text><text class="s" x="24" y="54">on the phone</text>
         <rect class="mod" x="180" y="10" width="150" height="56" rx="4"/><text class="t" x="194" y="34">USB audio in</text><text class="s" x="194" y="54">interface</text>
         <rect class="mod" x="95" y="106" width="150" height="70" rx="4"/><text class="t" x="109" y="136">Record</text><text class="s" x="109" y="156">into the phone</text>
-        <rect class="mod" x="10" y="240" width="100" height="50" rx="4"/><text class="t" x="24" y="261">Chop</text><text class="s" x="24" y="281">trim</text>
+        <rect class="mod" x="10" y="240" width="100" height="50" rx="4"/><text class="t" x="24" y="261">Chop</text><text class="s" x="24" y="281">trim, send</text>
         <rect class="mod" x="120" y="240" width="100" height="50" rx="4"/><text class="t" x="134" y="261">Split</text><text class="s" x="134" y="281">stems</text>
-        <rect class="mod" x="230" y="240" width="100" height="50" rx="4"/><text class="t" x="244" y="261">Rytm</text><text class="s" x="244" y="281">send</text>
+        <rect class="mod" x="230" y="240" width="100" height="50" rx="4"/><text class="t" x="244" y="261">Phone</text><text class="s" x="244" y="281">save, share</text>
         <path class="cab c" d="M85 66 C 85 92, 140 80, 140 106"/>
         <path class="cab c" d="M255 66 C 255 92, 200 80, 200 106"/>
         <path class="cab c" d="M130 176 C 130 210, 60 205, 60 240"/>
         <path class="cab a" d="M170 176 C 175 200, 165 215, 170 240"/>
-        <path class="cab s" d="M210 176 C 210 210, 280 205, 280 240"/>
+        <path class="cab n" d="M210 176 C 210 210, 280 205, 280 240"/>
         <g><circle class="jk" cx="85" cy="66" r="7"/><circle class="hole" cx="85" cy="66" r="3"/><circle class="plug c" cx="85" cy="66" r="5"/></g>
         <g><circle class="jk" cx="255" cy="66" r="7"/><circle class="hole" cx="255" cy="66" r="3"/><circle class="plug c" cx="255" cy="66" r="5"/></g>
         <g><circle class="jk" cx="140" cy="106" r="7"/><circle class="hole" cx="140" cy="106" r="3"/><circle class="plug c" cx="140" cy="106" r="5"/></g>
@@ -717,10 +729,10 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
         <g><circle class="jk" cx="60" cy="240" r="7"/><circle class="hole" cx="60" cy="240" r="3"/><circle class="plug c" cx="60" cy="240" r="5"/></g>
         <g><circle class="jk" cx="170" cy="176" r="7"/><circle class="hole" cx="170" cy="176" r="3"/><circle class="plug a" cx="170" cy="176" r="5"/></g>
         <g><circle class="jk" cx="170" cy="240" r="7"/><circle class="hole" cx="170" cy="240" r="3"/><circle class="plug a" cx="170" cy="240" r="5"/></g>
-        <g><circle class="jk" cx="210" cy="176" r="7"/><circle class="hole" cx="210" cy="176" r="3"/><circle class="plug s" cx="210" cy="176" r="5"/></g>
-        <g><circle class="jk" cx="280" cy="240" r="7"/><circle class="hole" cx="280" cy="240" r="3"/><circle class="plug s" cx="280" cy="240" r="5"/></g>
+        <g><circle class="jk" cx="210" cy="176" r="7"/><circle class="hole" cx="210" cy="176" r="3"/><circle class="plug n" cx="210" cy="176" r="5"/></g>
+        <g><circle class="jk" cx="280" cy="240" r="7"/><circle class="hole" cx="280" cy="240" r="3"/><circle class="plug n" cx="280" cy="240" r="5"/></g>
         </svg>
-        <figcaption>From the mic or a USB audio input, through Record, into the same tabs as any other sound.</figcaption>
+        <figcaption>From the mic or a USB audio input, through Record, on to Chop or Split like any other sound, or saved and shared as recorded.</figcaption>
       </figure>
     </div>
   </section>
@@ -810,7 +822,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
       <div class="sheet">
         <dl class="fields">
           <div data-c="C129"><dt>Full quality</dt><dd>Stereo FLAC at 44.1 kHz, exactly as the computer split it. Best for a DAW. This is the default.</dd></div>
-          <div data-c="C130"><dt>Rytm-ready</dt><dd>48 kHz mono WAV, the same file Send puts on the Rytm.</dd></div>
+          <div data-c="C130"><dt>Rytm-ready</dt><dd>48 kHz mono WAV, the file Send all starts from. Send all then normalizes and fades each stem, so the copy on the Rytm isn't identical to this file.</dd></div>
           <div data-c="C131"><dt>Folders</dt><dd>Stems go to Music/Rytm Mobile/&lt;track&gt; (&lt;mode&gt;), one folder per split and mode, so two modes of one song don't overwrite each other. Saving the same split again replaces what the app saved before.</dd></div>
           <div data-c="C132"><dt>Save all</dt><dd>Save all saves every stem in one go. A stem the computer has no FLAC for is saved as its 48 kHz WAV, and the app names it.</dd></div>
           <div data-c="C133"><dt>Zip</dt><dd>The computer packs every stem into one zip, saved to Download/Rytm Mobile. A stem with no file in that format is left out and listed in MISSING.txt inside the zip.</dd></div>
@@ -848,7 +860,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
       </ul>
       <h3>Its two commands</h3>
       <p data-c="C146"><code>pair</code> shows the code again, using the Tailscale address when Tailscale is on the computer and the home network address otherwise.</p>
-      <p data-c="C147">Re-running the installer updates the server and keeps your token, splits and models. <code>uninstall</code> moves everything aside and deletes nothing.</p>
+      <p data-c="C147">Re-running the installer updates the server and keeps your token, splits and models. <code>uninstall</code> stops the server and moves its folder aside; it deletes nothing. uv, any Python that uv downloaded, uv's download cache and, on Linux, lingering stay as they are.</p>
       <p class="more"><a href="./#setup">Step-by-step setup is on the download page.</a></p>
     </div>
   </section>
@@ -914,7 +926,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
     <div class="module-head"><span class="jack j-signal" aria-hidden="true"></span><h2 id="h-support">Support</h2><span class="tag">never locked</span></div>
     <div class="module-body">
       <p data-c="C155">Rytm Mobile is free software under the GPL‑3.0, and every feature works for everyone, whether you support it or not.</p>
-      <p data-c="C156">Now and then, never in your first session, a small card asks you to support it. <b>Later</b> or x closes it for this session; <b>I've supported it</b> hides it for good. The Rytm tab also has a <b>Support</b> button any time.</p>
+      <p data-c="C156">At the foot of the Rytm tab, connected or not, the About panel has a <b>Support</b> button and an <b>I've supported it</b> button. After you tap I've supported it, a thank-you line takes that button's place.</p>
     </div>
   </section>
   <!-- /UNMERGED:support -->
@@ -932,6 +944,7 @@ footer p { max-width: 65ch; margin-bottom: .5rem; }
             <tr data-c="C158"><td data-label="Platform">Stem server on Apple‑silicon Macs, Intel Macs and Ubuntu 24.04</td><td data-label="Status">Tested</td></tr>
             <tr data-c="C159"><td data-label="Platform">Analog Rytm MKII</td><td data-label="Status">Not tested (the protocol is the same in Elektroid)</td></tr>
             <tr data-c="C160"><td data-label="Platform">NVIDIA GPUs</td><td data-label="Status">Not tested</td></tr>
+            <!-- UNMERGED:record --><tr data-c="C164"><td data-label="Platform">Recording (phone mic, USB audio)</td><td data-label="Status">Not yet tested on hardware</td></tr><!-- /UNMERGED:record -->
           </tbody>
         </table>
       </div>
