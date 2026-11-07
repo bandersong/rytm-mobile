@@ -1,7 +1,7 @@
 {
- "versionCode": 8,
- "versionName": "1.4.0",
- "apk": "RytmMobile-1.4.0.apk",
- "sha256": "1ec8dab1f7dd5746c7df1493925448e96d6838121a78ecbbc95514f7cfc3a7ed",
- "notes": "Record audio right in the app: use the phone's mic or a USB mic or audio interface, then chop it, split it, save it or send it to the Rytm. Recording is new and not yet tested on hardware. The website now has a full features page."
+ "versionCode": 9,
+ "versionName": "1.4.1",
+ "apk": "RytmMobile-1.4.1.apk",
+ "sha256": "f969fb3a4796904ec3f1810cb66733e159b47774232eb71bd1c41634608c3eb6",
+ "notes": "Back button: up a +Drive folder, then back through tabs, then exit."
 }
