@@ -2,6 +2,7 @@ package com.bandersong.rytmmobile.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -50,6 +51,26 @@ private val SECTIONS = listOf("Rytm" to P.Signal, "Chop" to P.Cv, "Split" to P.A
 
 @Composable
 fun App(vm: AppState) {
+    // System Back / back gesture: up one +Drive folder, else back to the tab you came from, else leave the app.
+    // The recorder registers its own handler later, so it wins while it is open (it is also excluded here).
+    val tabTrail = remember { mutableStateListOf<Int>() }
+    var lastTab by remember { mutableIntStateOf(vm.tab) }
+    LaunchedEffect(vm.tab) {
+        if (vm.tab != lastTab) { tabTrail.add(lastTab); if (tabTrail.size > 8) tabTrail.removeAt(0); lastTab = vm.tab }
+    }
+    val canGoUp = vm.tab == 0 && vm.link != null && vm.dir != "/"
+    BackHandler(enabled = !vm.recModel.open && (canGoUp || vm.tab != 0)) {
+        when {
+            vm.busy -> Unit
+            canGoUp -> vm.open(vm.dir.substringBeforeLast('/').ifEmpty { "/" })
+            else -> {
+                var to = tabTrail.removeLastOrNull() ?: 0
+                while (to == vm.tab && tabTrail.isNotEmpty()) to = tabTrail.removeLast()
+                if (to == vm.tab) to = 0
+                lastTab = to; vm.tab = to
+            }
+        }
+    }
     Column(Modifier.fillMaxSize().background(P.Bg)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             // the signal rail down the left edge, as on the reference site
