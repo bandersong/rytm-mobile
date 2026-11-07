@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Rytm Mobile features</title>
+<meta name="description" content="Every feature of Rytm Mobile: +Drive transfer to the Analog Rytm MK1 over USB-MIDI, Chop, stem splitting on your own computer, and self-updates.">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#dfe5e3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12181a" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rytm Mobile">
+<meta property="og:title" content="Rytm Mobile features">
+<meta property="og:description" content="Every feature of Rytm Mobile: +Drive transfer to the Analog Rytm MK1 over USB-MIDI, Chop, stem splitting on your own computer, and self-updates.">
+<meta property="og:url" content="https://rytm-mobile.pages.dev/features.html">
+<meta property="og:image" content="https://rytm-mobile.pages.dev/icon.png">
+<meta property="og:image:alt" content="Rytm Mobile app icon">
+<meta name="twitter:card" content="summary">
+<style>
+/* Fonts: the app's own files, served from this site (fonts/FONTS.txt, fonts/OFL.txt). No third-party requests. */
+@font-face { font-family: "Barlow Semi Condensed"; src: url("fonts/barlow_sc_semibold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow Semi Condensed"; src: url("fonts/barlow_sc_bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/plex_sans.ttf") format("truetype"); font-weight: 100 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex_mono.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex_mono_medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
+
+:root {
+  --bg: #dfe5e3;
+  --panel: #f3f6f4;
+  --ink: #141b1f;
+  --signal: #b0261f;
+  --cv: #d99a00;
+  --audio: #1b5ea8;
+
+  --muted: color-mix(in srgb, var(--ink) 68%, var(--panel));
+  --line: color-mix(in srgb, var(--ink) 24%, var(--panel));
+  --well: color-mix(in srgb, var(--ink) 7%, var(--panel));
+  --shade: color-mix(in srgb, var(--ink) 20%, var(--bg));
+  --stripe: color-mix(in srgb, var(--ink) 3.5%, var(--panel));
+
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-s: 0.875rem;
+  --text-m: 1rem;
+  --text-l: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-hero: clamp(2.75rem, 9vw, 5rem);
+
+  --gutter: 16px;
+  --radius-panel: 6px;
+  --radius-card: 2px 14px 2px 14px;
+  --radius-ctl: 3px;
+  --radius-pill: 999px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181a;
+    --panel: #1c2528;
+    --ink: #e4eae8;
+    --signal: #ff7467;
+    --cv: #f0b429;
+    --audio: #7ab8f5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181a;
+  --panel: #1c2528;
+  --ink: #e4eae8;
+  --signal: #ff7467;
+  --cv: #f0b429;
+  --audio: #7ab8f5;
+  color-scheme: dark;
+}
+/* Browsers without color-mix(): the same mixes, worked out ahead of time. */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  :root { --muted: #5b6163; --line: #bdc1c1; --well: #e3e7e5; --shade: #b6bdbc; --stripe: #ebeeed; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --muted: #a4abab; --line: #4c5456; --well: #2a3335; --shade: #3c4243; --stripe: #232c2f; }
+  }
+  :root[data-theme="dark"] { --muted: #a4abab; --line: #4c5456; --well: #2a3335; --shade: #3c4243; --stripe: #232c2f; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-m);
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .jack, .theme .knob, button, .nav a { transition: background-color .15s ease, transform .15s ease, border-color .15s ease; }
+}
+:focus-visible { outline: 3px solid var(--audio); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.js-only { display: none !important; }
+.js .js-only { display: inline-flex !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.skip { position: absolute; left: var(--gutter); top: -4rem; background: var(--panel); color: var(--ink); padding: .5rem .75rem; border: 2px solid var(--ink); z-index: 30; }
+.skip:focus { top: .5rem; }
+
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.1; text-wrap: balance; margin: 0; }
+p { margin: 0 0 1rem; max-width: 65ch; }
+a { color: var(--audio); text-underline-offset: 3px; }
+code, kbd, pre, .mono { font-family: var(--font-mono); font-size: .9em; font-variant-numeric: tabular-nums; }
+code { background: var(--well); padding: .08em .35em; border-radius: 2px; overflow-wrap: anywhere; }
+ul, ol { padding-left: 1.25rem; margin: 0 0 1rem; }
+li { margin-bottom: .35rem; max-width: 65ch; }
+
+/* ---------- page frame ---------- */
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px max(var(--gutter), env(safe-area-inset-right)) 12px max(var(--gutter), env(safe-area-inset-left));
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: .12em; font-size: var(--text-s); font-weight: 600;
+  color: var(--muted);
+  max-width: 1160px; margin-inline: auto;
+}
+.top > span { min-width: 0; }
+.top-r { display: flex; align-items: center; gap: 4px 14px; flex: 0 0 auto; }
+.top a {
+  display: inline-flex; align-items: center; min-height: 44px; color: var(--ink);
+  font-family: var(--font-display); font-size: var(--text-s); font-weight: 600; text-transform: uppercase; letter-spacing: .12em;
+}
+.theme {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px;
+  background: var(--panel); color: var(--ink); border: 2px solid var(--ink); border-radius: var(--radius-pill);
+  padding: 4px 14px 4px 6px; font: inherit; font-size: var(--text-s); cursor: pointer; letter-spacing: .12em; text-transform: uppercase;
+}
+.theme .knob {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--ink) 0 14%, var(--panel) 16% 100%);
+  border: 2px solid var(--ink); position: relative;
+}
+.theme .knob::after { content: ""; position: absolute; left: 50%; top: 2px; width: 2px; height: 8px; margin-left: -1px; background: var(--signal); transform-origin: 50% 9px; transform: rotate(-50deg); }
+.theme[data-dark="true"] .knob::after { transform: rotate(50deg); }
+
+.shell { max-width: 1160px; margin-inline: auto; }
+.nav {
+  position: sticky; top: 0; z-index: 20; background: var(--bg);
+  border-bottom: 2px solid var(--ink);
+  padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left));
+}
+.nav ul { list-style: none; margin: 0; padding: 5px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; } /* 5px = focus ring 3px + offset 2px, inside the scroller */
+.nav li { margin: 0; flex: 0 0 auto; max-width: none; }
+.nav a {
+  display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 10px;
+  color: var(--ink); text-decoration: none; white-space: nowrap;
+  font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .1em; font-size: var(--text-s);
+}
+.nav a:hover { background: var(--well); }
+.nav .jack { width: 14px; height: 14px; }
+.nav a[aria-current="location"] .jack { background: radial-gradient(circle at 50% 50%, var(--ink) 0 26%, var(--cv) 30% 100%); }
+.nav a[aria-current="location"] { box-shadow: inset 0 -4px 0 var(--signal); }
+.nav-label { display: none; }
+
+.jack {
+  display: inline-block; flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: radial-gradient(circle at 50% 50%, var(--ink) 0 26%, var(--panel) 30% 100%);
+}
+.jack.j-signal { background: radial-gradient(circle at 50% 50%, var(--ink) 0 26%, var(--signal) 30% 100%); }
+.jack.j-cv { background: radial-gradient(circle at 50% 50%, var(--ink) 0 26%, var(--cv) 30% 100%); }
+.jack.j-audio { background: radial-gradient(circle at 50% 50%, var(--ink) 0 26%, var(--audio) 30% 100%); }
+
+main { padding: 24px max(var(--gutter), env(safe-area-inset-right)) 64px max(var(--gutter), env(safe-area-inset-left)); position: relative; min-width: 0; }
+.intro { margin-bottom: 28px; }
+.eyebrow { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .16em; font-weight: 600; color: var(--signal); font-size: var(--text-s); margin: 0 0 6px; }
+h1 { font-size: var(--text-hero); font-weight: 700; text-transform: uppercase; letter-spacing: .01em; }
+.intro h1 { margin-bottom: 14px; }
+.lead { font-size: var(--text-l); max-width: 60ch; }
+
+/* ---------- module panels ---------- */
+.module {
+  position: relative; margin: 0 0 32px; scroll-margin-top: 72px;
+  background: repeating-linear-gradient(90deg, var(--stripe) 0 1px, var(--panel) 1px 4px);
+  border: 2px solid var(--ink); border-radius: var(--radius-panel);
+  box-shadow: 5px 5px 0 var(--shade);
+  min-width: 0;
+}
+.module::after {
+  content: ""; position: absolute; right: 12px; top: 12px; width: 12px; height: 12px; border-radius: 50%;
+  background:
+    linear-gradient(110deg, var(--panel) 38%, var(--ink) 38% 62%, var(--panel) 62%) 50% 50% / 8px 8px no-repeat,
+    radial-gradient(circle at 35% 35%, var(--panel), var(--line));
+  border: 1.5px solid var(--ink);
+}
+.module-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px;
+  padding: 16px 40px 12px 16px; border-bottom: 2px solid var(--ink);
+  background: var(--well); border-radius: 4px 4px 0 0;
+}
+.module-head .jack { align-self: center; }
+.module-head h2 { font-size: var(--text-xl); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; min-width: 0; }
+.module-head .tag { font-family: var(--font-mono); font-size: var(--text-s); color: var(--muted); min-width: 0; }
+.module-body { padding: clamp(14px, 3vw, 24px); min-width: 0; }
+.module-body > :last-child { margin-bottom: 0; }
+.module h3 { font-size: var(--text-l); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; margin: 28px 0 10px; }
+.module h3:first-child { margin-top: 0; }
+
+/* ---------- tables ---------- */
+.scroll { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; border: 1.5px solid var(--line); border-radius: 2px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: var(--text-s); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; font-weight: 700; color: var(--muted); background: var(--well); white-space: nowrap; }
+td:first-child { font-weight: 600; }
+.scroll table { min-width: 36rem; }
+td .chip { margin: 0 4px 4px 0; }
+
+/* ---------- chips ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 2px 10px 2px 8px; border-radius: var(--radius-pill);
+  border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink);
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: .75rem; font-weight: 700; white-space: nowrap;
+}
+.chip::before { content: ""; width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.chip.pub::before { background: var(--audio); border: 1.5px solid var(--ink); }
+.chip.eph::before { border: 2px solid var(--signal); background: var(--panel); }
+.chip.host::before { background: var(--cv); border: 1.5px solid var(--ink); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 12px; max-width: none; }
+.legend .silk { margin: 0 4px 0 0; }
+.silk { display: inline-block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; font-weight: 700; color: var(--muted); margin: 0 0 4px; }
+
+/* ---------- spec sheets ---------- */
+.sheet { border: 2px solid var(--ink); border-radius: var(--radius-card); background: var(--panel); margin: 0 0 1rem; min-width: 0; }
+.fields { margin: 0; padding: 4px 14px 12px; display: grid; gap: 0; }
+.fields > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.fields > div:last-child { border-bottom: 0; }
+.fields dt { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; font-weight: 700; color: var(--muted); padding-top: 3px; }
+.fields dd { margin: 0; min-width: 0; }
+.case { font-weight: 600; }
+.api { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: 6px; max-width: none; }
+.api li { margin: 0; }
+.api code { display: inline-block; padding: 3px 8px; border: 1.5px solid var(--line); }
+
+/* ---------- callouts, rails ---------- */
+.rail { list-style: none; padding: 0 0 0 28px; margin: 0 0 1rem; position: relative; }
+.rail::before { content: ""; position: absolute; left: 9px; top: 12px; bottom: 12px; width: 4px; background: var(--audio); border-radius: 2px; }
+.rail li { position: relative; margin: 0 0 12px; max-width: 65ch; }
+.rail li::before { content: ""; position: absolute; left: -28px; top: 4px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--ink); background: var(--cv); }
+.callout { border: 2px solid var(--ink); border-left-width: 8px; border-radius: 10px 2px 10px 2px; padding: 12px 14px; margin: 0 0 1rem; background: var(--panel); max-width: 65ch; }
+.callout.warn { border-left-color: var(--signal); }
+.callout.info { border-left-color: var(--audio); }
+.callout > :last-child { margin-bottom: 0; }
+.callout strong { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; }
+.more { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
+
+/* ---------- figures ---------- */
+.flow { margin: 0 0 1.25rem; }
+.flow svg { display: block; width: 100%; height: auto; }
+.flow .tall { display: none; }
+.flow svg.wave { max-width: 560px; }
+.flow figcaption { font-size: var(--text-s); color: var(--muted); margin-top: 8px; max-width: 65ch; }
+.mod { fill: var(--panel); stroke: var(--ink); stroke-width: 2; }
+.t { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; fill: var(--ink); }
+.s { font-family: var(--font-mono); font-size: 11.5px; fill: var(--muted); }
+.lab { paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+.jk { fill: var(--bg); stroke: var(--ink); stroke-width: 2; }
+.hole { fill: var(--ink); }
+.cab { fill: none; stroke-width: 4.5; stroke-linecap: round; }
+.cab.a { stroke: var(--audio); }
+.cab.c { stroke: var(--cv); }
+.cab.s { stroke: var(--signal); }
+.cab.n { stroke: var(--ink); }
+.plug { stroke: var(--ink); stroke-width: 1.5; }
+.plug.a { fill: var(--audio); }
+.plug.c { fill: var(--cv); }
+.plug.s { fill: var(--signal); }
+.plug.n { fill: var(--panel); }
+.wv { fill: none; stroke: var(--signal); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
+.wbg { fill: var(--bg); stroke: var(--ink); stroke-width: 2; }
+.gl { stroke: var(--line); stroke-width: 1; }
+.gl.k { stroke-width: 2; }
+.bi { fill: var(--signal); }
+.bo { fill: var(--muted); }
+.ov { fill: var(--shade); opacity: .55; }
+/* Dark: the app darkens the cut ends with its near-black Shade (#0b0f10); lightening them would invert the view. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ov { fill: #0b0f10; } }
+:root[data-theme="dark"] .ov { fill: #0b0f10; }
+.hd { stroke: var(--cv); stroke-width: 3; }
+.tab { fill: var(--cv); stroke: var(--ink); stroke-width: 1.5; }
+.wl { font-size: 13px; fill: var(--ink); }
+
+/* ---------- footer ---------- */
+footer { padding: 0 max(var(--gutter), env(safe-area-inset-right)) 40px max(var(--gutter), env(safe-area-inset-left)); color: var(--muted); font-size: var(--text-s); max-width: 1160px; margin-inline: auto; }
+footer p { max-width: 65ch; margin-bottom: .5rem; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 719px) {
+  .module-head { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 4px; align-items: center; }
+  .module-head .tag { grid-column: 2; }
+  .flow .wide { display: none; }
+  .flow .tall { display: block; max-width: 26rem; }
+  .stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .stack, .stack tbody, .stack tr, .stack td { display: block; width: 100%; }
+  .scroll table.stack { min-width: 0; }
+  .stack tr { padding: 8px 0; border-bottom: 2px solid var(--ink); }
+  .stack tr:last-child { border-bottom: 0; }
+  .stack td { border: 0; padding: 4px 12px; }
+  .stack td::before { content: attr(data-label); display: block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; font-weight: 700; color: var(--muted); }
+}
+@media (min-width: 350px) {
+  .module-body code { white-space: nowrap; }
+}
+@media (min-width: 720px) {
+  main { padding-left: max(52px, env(safe-area-inset-left)); }
+  main::before { content: ""; position: absolute; left: 14px; top: 0; bottom: 24px; width: 5px; background: var(--signal); border-radius: 3px; }
+  .module::before {
+    content: ""; position: absolute; left: -45px; top: 14px; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--cv); border: 3px solid var(--ink); box-shadow: 0 0 0 3px var(--bg);
+  }
+  .module-head .jack { display: none; }
+  .fields > div { grid-template-columns: 8rem minmax(0, 1fr); gap: 14px; }
+  .fields dt { padding-top: 4px; }
+}
+@media (min-width: 1000px) {
+  .shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0; align-items: start; }
+  .nav { top: 16px; align-self: start; border-bottom: 0; background: none; padding: 0 0 0 max(var(--gutter), env(safe-area-inset-left)); margin-top: 24px; }
+  .nav ul { flex-direction: column; overflow: visible; gap: 2px; border: 2px solid var(--ink); border-radius: var(--radius-panel); background: var(--panel); padding: 6px 0; box-shadow: 5px 5px 0 var(--shade); }
+  .nav-label { display: block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .16em; font-size: .75rem; font-weight: 700; color: var(--muted); padding: 8px 10px 4px; }
+  .nav a { min-height: 40px; }
+  .nav a[aria-current="location"] { box-shadow: inset 4px 0 0 var(--signal); background: var(--well); }
+  .module { scroll-margin-top: 16px; }
+  main { max-width: 900px; }
+}
+@media print { .nav, .top { display: none; } .module { box-shadow: none; } }
+</style>
+</head>
+<body>
+<script>
+(function () {
+  var root = document.documentElement;
+  root.className += ' js';
+  var KEY = 'rm-theme';
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+  } catch (e) { /* storage blocked: follow the phone's theme */ }
+
+  function $(id) { return document.getElementById(id); }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    /* theme toggle */
+    var tbtn = $('theme');
+    var tlabel = $('theme-label');
+    var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    function isDark() {
+      var t = root.getAttribute('data-theme');
+      if (t) return t === 'dark';
+      return !!(mq && mq.matches);
+    }
+    function paint() {
+      var d = isDark();
+      tbtn.setAttribute('data-dark', d ? 'true' : 'false');
+      tlabel.textContent = d ? 'Dark' : 'Light';
+    }
+    tbtn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ }
+      paint();
+    });
+    if (mq && mq.addEventListener) mq.addEventListener('change', paint);
+    paint();
+
+    /* highlight the section in view */
+    if ('IntersectionObserver' in window) {
+      var links = {};
+      Array.prototype.forEach.call(document.querySelectorAll('.nav a'), function (a) { links[a.getAttribute('href').slice(1)] = a; });
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          Object.keys(links).forEach(function (k) { links[k].removeAttribute('aria-current'); });
+          if (links[en.target.id]) links[en.target.id].setAttribute('aria-current', 'location');
+        });
+      }, { rootMargin: '-20% 0px -70% 0px' });
+      Array.prototype.forEach.call(document.querySelectorAll('main > section.module'), function (s) { io.observe(s); });
+    }
+
+    /* Below 1000px the section links scroll sideways, and Chrome leaves a link that is only partly in view where it is
+       when it takes focus. Bring the focused link, and its 5px focus ring, fully into view. */
+    var navUl = document.querySelector('.nav ul');
+    if (navUl) navUl.addEventListener('focusin', function (e) {
+      var r = e.target.getBoundingClientRect(), u = navUl.getBoundingClientRect(), pad = 5;
+      if (r.left < u.left + pad) navUl.scrollLeft -= (u.left + pad - r.left);
+      else if (r.right > u.right - pad) navUl.scrollLeft += (r.right - (u.right - pad));
+    });
+  });
+})();
+</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="top">
+  <span>Feature reference</span>
+  <div class="top-r">
+    <a href="./#download">Download</a>
+    <button class="theme js-only" id="theme" type="button" data-dark="false">
+      <span class="knob" aria-hidden="true"></span><span class="sr">Theme: </span><span id="theme-label">Light</span>
+    </button>
+  </div>
+</div>
+
+<div class="shell">
+<nav class="nav" aria-label="Sections">
+  <span class="nav-label">Patch bay</span>
+  <ul>
+    <li><a href="#overview"><span class="jack" aria-hidden="true"></span>Overview</a></li>
+    <li><a href="#rytm"><span class="jack" aria-hidden="true"></span>Rytm</a></li>
+    <li><a href="#chop"><span class="jack" aria-hidden="true"></span>Chop</a></li>
+    <!-- UNMERGED:record --><li><a href="#record"><span class="jack" aria-hidden="true"></span>Record</a></li><!-- /UNMERGED:record -->
+    <li><a href="#split"><span class="jack" aria-hidden="true"></span>Split</a></li>
+    <li><a href="#computer"><span class="jack" aria-hidden="true"></span>Your computer</a></li>
+    <li><a href="#updates"><span class="jack" aria-hidden="true"></span>Updates</a></li>
+    <!-- UNMERGED:support --><li><a href="#support"><span class="jack" aria-hidden="true"></span>Support</a></li><!-- /UNMERGED:support -->
+    <li><a href="#status"><span class="jack" aria-hidden="true"></span>Limits &amp; status</a></li>
+  </ul>
+</nav>
+
+<main id="main">
+  <div class="intro">
+    <p class="eyebrow">Feature reference</p>
+    <h1>Rytm Mobile</h1>
+    <p class="lead">What the app does, tab by tab, and what runs on your computer for Split.</p>
+  </div>
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <section class="module" id="overview" aria-labelledby="h-overview">
+    <div class="module-head"><span class="jack" aria-hidden="true"></span><h2 id="h-overview">Overview</h2><span class="tag">signal path</span></div>
+    <div class="module-body">
+      <p data-c="C075">Rytm Mobile has three tabs, Rytm, Chop and Split, on a bottom bar drawn as a patch bay: a jack for each tab, with a cable plugged into the one you're on.</p>
+      <p data-c="C076">A jack lights up when its tab has something going: the Rytm is connected, a sample is loaded, or a split is done.</p>
+      <p data-c="C077">The app keeps your sample and the USB link when you rotate or fold the phone.</p>
+      <p data-c="C078">One job runs at a time. The status line under the title says what's happening, with a 16‑step progress bar; errors turn it red.</p>
+      <figure class="flow" data-cref="C079">
+        <svg class="wide" viewBox="0 0 900 292" role="img" aria-labelledby="f1w-t">
+        <title id="f1w-t">Signal path: a file goes through Chop to the Rytm over USB‑MIDI. Split sends a track to your computer and brings the stems back to Chop, to the phone, or to the Rytm.</title>
+        <rect class="mod" x="10" y="30" width="150" height="76" rx="4"/><text class="t" x="24" y="64">Any file</text><text class="s" x="24" y="84">audio or video</text>
+        <rect class="mod" x="370" y="30" width="150" height="76" rx="4"/><text class="t" x="384" y="64">Chop</text><text class="s" x="384" y="84">trim, 48k mono</text>
+        <rect class="mod" x="730" y="30" width="160" height="76" rx="4"/><text class="t" x="744" y="64">Rytm</text><text class="s" x="744" y="84">+Drive</text>
+        <rect class="mod" x="10" y="170" width="150" height="76" rx="4"/><text class="t" x="24" y="204">Your computer</text><text class="s" x="24" y="224">stem server</text>
+        <rect class="mod" x="370" y="170" width="150" height="76" rx="4"/><text class="t" x="384" y="204">Stems</text><text class="s" x="384" y="224">WAV + FLAC</text>
+        <rect class="mod" x="730" y="170" width="160" height="76" rx="4"/><text class="t" x="744" y="204">Phone</text><text class="s" x="744" y="224">Music/Rytm Mobile</text>
+        <path class="cab c" d="M160 68 C 240 112, 290 112, 370 68"/>
+        <path class="cab s" d="M520 68 C 600 112, 650 112, 730 68"/>
+        <path class="cab a" d="M70 106 C 50 128, 90 148, 70 170"/>
+        <path class="cab a" d="M160 208 C 240 252, 290 252, 370 208"/>
+        <path class="cab c" d="M445 170 C 425 148, 465 128, 445 106"/>
+        <path class="cab s" d="M520 190 C 640 190, 810 176, 810 106"/>
+        <path class="cab a" d="M520 226 C 600 270, 650 270, 730 226"/>
+        <text class="s lab" x="625" y="126" text-anchor="middle">USB-MIDI</text>
+        <text class="s lab" x="88" y="142">Wi-Fi or Tailscale</text>
+        <text class="s lab" x="640" y="172" text-anchor="middle">Send all</text>
+        <text class="s lab" x="625" y="284" text-anchor="middle">Save</text>
+        <g><circle class="jk" cx="160" cy="68" r="7"/><circle class="hole" cx="160" cy="68" r="3"/><circle class="plug c" cx="160" cy="68" r="5"/></g>
+        <g><circle class="jk" cx="370" cy="68" r="7"/><circle class="hole" cx="370" cy="68" r="3"/><circle class="plug c" cx="370" cy="68" r="5"/></g>
+        <g><circle class="jk" cx="520" cy="68" r="7"/><circle class="hole" cx="520" cy="68" r="3"/><circle class="plug s" cx="520" cy="68" r="5"/></g>
+        <g><circle class="jk" cx="730" cy="68" r="7"/><circle class="hole" cx="730" cy="68" r="3"/><circle class="plug s" cx="730" cy="68" r="5"/></g>
+        <g><circle class="jk" cx="70" cy="106" r="7"/><circle class="hole" cx="70" cy="106" r="3"/><circle class="plug a" cx="70" cy="106" r="5"/></g>
+        <g><circle class="jk" cx="70" cy="170" r="7"/><circle class="hole" cx="70" cy="170" r="3"/><circle class="plug a" cx="70" cy="170" r="5"/></g>
+        <g><circle class="jk" cx="160" cy="208" r="7"/><circle class="hole" cx="160" cy="208" r="3"/><circle class="plug a" cx="160" cy="208" r="5"/></g>
+        <g><circle class="jk" cx="370" cy="208" r="7"/><circle class="hole" cx="370" cy="208" r="3"/><circle class="plug a" cx="370" cy="208" r="5"/></g>
+        <g><circle class="jk" cx="445" cy="170" r="7"/><circle class="hole" cx="445" cy="170" r="3"/><circle class="plug c" cx="445" cy="170" r="5"/></g>
+        <g><circle class="jk" cx="445" cy="106" r="7"/><circle class="hole" cx="445" cy="106" r="3"/><circle class="plug c" cx="445" cy="106" r="5"/></g>
+        <g><circle class="jk" cx="520" cy="190" r="7"/><circle class="hole" cx="520" cy="190" r="3"/><circle class="plug s" cx="520" cy="190" r="5"/></g>
+        <g><circle class="jk" cx="810" cy="106" r="7"/><circle class="hole" cx="810" cy="106" r="3"/><circle class="plug s" cx="810" cy="106" r="5"/></g>
+        <g><circle class="jk" cx="520" cy="226" r="7"/><circle class="hole" cx="520" cy="226" r="3"/><circle class="plug a" cx="520" cy="226" r="5"/></g>
+        <g><circle class="jk" cx="730" cy="226" r="7"/><circle class="hole" cx="730" cy="226" r="3"/><circle class="plug a" cx="730" cy="226" r="5"/></g>
+        </svg>
+        <svg class="tall" viewBox="0 0 340 380" role="img" aria-labelledby="f1t-t">
+        <title id="f1t-t">Signal path: a file goes through Chop to the Rytm over USB‑MIDI. Split sends a track to your computer and brings the stems back to Chop, to the phone, or to the Rytm.</title>
+        <rect class="mod" x="10" y="10" width="150" height="60" rx="4"/><text class="t" x="24" y="36">Any file</text><text class="s" x="24" y="56">audio or video</text>
+        <rect class="mod" x="190" y="10" width="140" height="60" rx="4"/><text class="t" x="204" y="36">Computer</text><text class="s" x="204" y="56">stem server</text>
+        <rect class="mod" x="10" y="150" width="150" height="60" rx="4"/><text class="t" x="24" y="176">Chop</text><text class="s" x="24" y="196">trim, 48k mono</text>
+        <rect class="mod" x="190" y="150" width="140" height="60" rx="4"/><text class="t" x="204" y="176">Stems</text><text class="s" x="204" y="196">WAV + FLAC</text>
+        <rect class="mod" x="10" y="310" width="150" height="60" rx="4"/><text class="t" x="24" y="336">Rytm</text><text class="s" x="24" y="356">+Drive</text>
+        <rect class="mod" x="190" y="310" width="140" height="60" rx="4"/><text class="t" x="204" y="336">Phone</text><text class="s" x="204" y="356">Music folder</text>
+        <path class="cab c" d="M85 70 C 105 100, 65 120, 85 150"/>
+        <path class="cab a" d="M160 40 C 168 60, 182 60, 190 40"/>
+        <path class="cab a" d="M260 70 C 280 100, 240 120, 260 150"/>
+        <path class="cab c" d="M190 180 C 182 200, 168 200, 160 180"/>
+        <path class="cab s" d="M85 210 C 105 250, 65 270, 85 310"/>
+        <path class="cab s" d="M225 210 C 225 270, 200 340, 160 340"/>
+        <path class="cab a" d="M295 210 C 315 250, 275 270, 295 310"/>
+        <text class="s lab" x="98" y="264">USB-MIDI</text>
+        <text class="s lab" x="270" y="114">Wi-Fi or</text>
+        <text class="s lab" x="270" y="128">Tailscale</text>
+        <text class="s lab" x="170" y="286">Send all</text>
+        <text class="s lab" x="306" y="264">Save</text>
+        <g><circle class="jk" cx="85" cy="70" r="7"/><circle class="hole" cx="85" cy="70" r="3"/><circle class="plug c" cx="85" cy="70" r="5"/></g>
+        <g><circle class="jk" cx="85" cy="150" r="7"/><circle class="hole" cx="85" cy="150" r="3"/><circle class="plug c" cx="85" cy="150" r="5"/></g>
+        <g><circle class="jk" cx="160" cy="40" r="7"/><circle class="hole" cx="160" cy="40" r="3"/><circle class="plug a" cx="160" cy="40" r="5"/></g>
+        <g><circle class="jk" cx="190" cy="40" r="7"/><circle class="hole" cx="190" cy="40" r="3"/><circle class="plug a" cx="190" cy="40" r="5"/></g>
+        <g><circle class="jk" cx="260" cy="70" r="7"/><circle class="hole" cx="260" cy="70" r="3"/><circle class="plug a" cx="260" cy="70" r="5"/></g>
+        <g><circle class="jk" cx="260" cy="150" r="7"/><circle class="hole" cx="260" cy="150" r="3"/><circle class="plug a" cx="260" cy="150" r="5"/></g>
+        <g><circle class="jk" cx="190" cy="180" r="7"/><circle class="hole" cx="190" cy="180" r="3"/><circle class="plug c" cx="190" cy="180" r="5"/></g>
+        <g><circle class="jk" cx="160" cy="180" r="7"/><circle class="hole" cx="160" cy="180" r="3"/><circle class="plug c" cx="160" cy="180" r="5"/></g>
+        <g><circle class="jk" cx="85" cy="210" r="7"/><circle class="hole" cx="85" cy="210" r="3"/><circle class="plug s" cx="85" cy="210" r="5"/></g>
+        <g><circle class="jk" cx="85" cy="310" r="7"/><circle class="hole" cx="85" cy="310" r="3"/><circle class="plug s" cx="85" cy="310" r="5"/></g>
+        <g><circle class="jk" cx="225" cy="210" r="7"/><circle class="hole" cx="225" cy="210" r="3"/><circle class="plug s" cx="225" cy="210" r="5"/></g>
+        <g><circle class="jk" cx="160" cy="340" r="7"/><circle class="hole" cx="160" cy="340" r="3"/><circle class="plug s" cx="160" cy="340" r="5"/></g>
+        <g><circle class="jk" cx="295" cy="210" r="7"/><circle class="hole" cx="295" cy="210" r="3"/><circle class="plug a" cx="295" cy="210" r="5"/></g>
+        <g><circle class="jk" cx="295" cy="310" r="7"/><circle class="hole" cx="295" cy="310" r="3"/><circle class="plug a" cx="295" cy="310" r="5"/></g>
+        </svg>
+        <figcaption data-c="C079">Signal path: a file goes through Chop to the Rytm over USB‑MIDI. Split sends a track to your computer and brings the stems back to Chop, to the phone, or to the Rytm.</figcaption>
+      </figure>
+      <p class="legend"><span class="silk">What each feature needs</span> <span class="chip pub">Phone</span> <span class="chip eph">Rytm + OTG cable</span> <span class="chip host">Your computer</span></p>
+      <div class="scroll">
+        <table class="stack">
+          <thead><tr><th scope="col">Feature</th><th scope="col">Needs</th></tr></thead>
+          <tbody>
+            <tr data-cref="C080 C085 C087 C088"><td data-label="Feature">Browse +Drive, make folders, delete samples</td><td data-label="Needs"><span class="chip pub">Phone</span><span class="chip eph">Rytm + OTG cable</span></td></tr>
+            <tr data-cref="C099 C111 C112"><td data-label="Feature">Chop, save and share a chop</td><td data-label="Needs"><span class="chip pub">Phone</span></td></tr>
+            <tr data-cref="C090"><td data-label="Feature">Send a sample</td><td data-label="Needs"><span class="chip pub">Phone</span><span class="chip eph">Rytm + OTG cable</span></td></tr>
+            <tr data-cref="C116 C129 C133 C137"><td data-label="Feature">Split, save stems, zip, History</td><td data-label="Needs"><span class="chip pub">Phone</span><span class="chip host">Your computer</span></td></tr>
+            <tr data-cref="C136"><td data-label="Feature">Send all stems</td><td data-label="Needs"><span class="chip pub">Phone</span><span class="chip host">Your computer</span><span class="chip eph">Rytm + OTG cable</span></td></tr>
+            <tr data-cref="C149"><td data-label="Feature">Updates</td><td data-label="Needs"><span class="chip pub">Phone</span> and an internet connection</td></tr>
+            <!-- UNMERGED:record --><tr data-cref="C114"><td data-label="Feature">Record</td><td data-label="Needs"><span class="chip pub">Phone</span> and its mic or a USB audio input</td></tr><!-- /UNMERGED:record -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== RYTM ===================== -->
+  <section class="module" id="rytm" aria-labelledby="h-rytm">
+    <div class="module-head"><span class="jack j-signal" aria-hidden="true"></span><h2 id="h-rytm">Rytm</h2><span class="tag">+Drive over USB-MIDI</span></div>
+    <div class="module-body">
+      <h3>Connect</h3>
+      <p data-c="C080">Patch the Rytm into the phone with a USB‑C OTG cable, set its USB mode to USB MIDI, and tap <b>Patch in</b>.</p>
+      <p data-c="C081">The app looks for a MIDI device whose name says Elektron or Rytm, tries each pair of its ports, and keeps the first that answers. If no Elektron device shows up, it tries any USB MIDI device.</p>
+      <p data-c="C082">Once connected, the panel shows the Rytm's name and the OS version it reports.</p>
+      <p data-c="C083">Android can open Rytm Mobile when you plug in an Elektron USB device, and the app connects as it opens. While it's open, plugging the Rytm in connects it, and unplugging drops the link at once.</p>
+      <p data-c="C084">If the link goes stale (sleep, a cable wiggle, folding the phone) and the Rytm stops answering, the app reconnects once and repeats what you asked.</p>
+
+      <h3>Browse +Drive</h3>
+      <p data-c="C085">Tap through folders with the path at the top, <b>..</b> to go up, and <b>Refresh</b>. Folders come first, then samples, by name.</p>
+      <p data-c="C086">Each sample shows its length in seconds.</p>
+      <p data-c="C087">Make a folder from the <b>New folder</b> field. Rytm names use letters, digits, spaces, _ and -, up to 24 characters; anything else becomes _.</p>
+      <p data-c="C088">Delete a sample with the x button. The app asks first: "It goes from the Rytm's +Drive. Samples already loaded into RAM stay."</p>
+      <p data-c="C089">Folders can't be deleted or renamed from the app, and samples can't be renamed.</p>
+
+      <h3>Send</h3>
+      <p data-c="C090">Send puts your chop in the folder that's open on the Rytm tab, under its <b>Name on Rytm</b>.</p>
+      <div class="sheet">
+        <dl class="fields">
+          <div data-c="C091"><dt>Format</dt><dd>48 kHz, 16‑bit mono, the Rytm's native format.</dd></div>
+          <div data-c="C092"><dt>Protocol</dt><dd>Elektron's SysEx file‑transfer protocol, ported from Elektroid.</dd></div>
+          <div data-c="C093"><dt>Pace</dt><dd>8,192‑byte blocks with a 50 ms rest between them, as Elektroid does.</dd></div>
+          <div data-c="C094"><dt>When it's done</dt><dd>The status line shows the sample's length and how long the send took.</dd></div>
+        </dl>
+      </div>
+      <p data-c="C095">The Rytm gets up to 20 seconds to make room for a new file.</p>
+
+      <h3>Checked against Elektroid</h3>
+      <p data-c="C096">The repository builds Elektroid's own C message code, and a unit test checks the app's SysEx against it byte for byte.</p>
+      <p data-c="C097">Another test decodes a real ping reply from an Analog Rytm MK1.</p>
+
+      <h3>Log</h3>
+      <p data-c="C098"><b>Show log</b> lists what the app tried and what the Rytm answered while connecting, then one line per message during transfers. It keeps the last 400 lines, and <b>Copy</b> puts it on the clipboard.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHOP ===================== -->
+  <section class="module" id="chop" aria-labelledby="h-chop">
+    <div class="module-head"><span class="jack j-cv" aria-hidden="true"></span><h2 id="h-chop">Chop</h2><span class="tag">trim and send</span></div>
+    <div class="module-body">
+      <h3>Open</h3>
+      <p data-c="C099">Open any audio or video file on the phone, or share one to Rytm Mobile from another app.</p>
+      <p data-c="C100">MP3, WAV (16, 24 and 32-bit), M4A and FLAC open, and so do screen recordings and voice memos. Beyond that it depends on the phone's own decoders.</p>
+      <p data-c="C101">A video gives up its first sound track. Stereo and multichannel sound is mixed down to mono.</p>
+
+      <h3>Convert</h3>
+      <p data-c="C102">Anything that isn't 48 kHz is resampled with a Kaiser-windowed sinc filter, 64 zero crossings each side, with the cutoff below the lower Nyquist so downsampling doesn't alias.</p>
+      <p data-c="C103">The 16‑bit conversion adds TPDF dither.</p>
+
+      <h3>Trim</h3>
+      <figure class="flow" data-cref="C104 C105">
+        <svg class="wave" viewBox="0 0 480 170" role="img" aria-labelledby="f2-t">
+        <title id="f2-t">Trimming: drag the start and end handles on the waveform; the part between them is what you keep.</title>
+        <rect class="wbg" x="2" y="2" width="476" height="166" rx="4"/>
+        <line class="gl" x1="44.0" y1="10" x2="44.0" y2="160"/>
+        <line class="gl" x1="72.0" y1="10" x2="72.0" y2="160"/>
+        <line class="gl" x1="100.0" y1="10" x2="100.0" y2="160"/>
+        <line class="gl k" x1="128.0" y1="10" x2="128.0" y2="160"/>
+        <line class="gl" x1="156.0" y1="10" x2="156.0" y2="160"/>
+        <line class="gl" x1="184.0" y1="10" x2="184.0" y2="160"/>
+        <line class="gl" x1="212.0" y1="10" x2="212.0" y2="160"/>
+        <line class="gl k" x1="240.0" y1="10" x2="240.0" y2="160"/>
+        <line class="gl" x1="268.0" y1="10" x2="268.0" y2="160"/>
+        <line class="gl" x1="296.0" y1="10" x2="296.0" y2="160"/>
+        <line class="gl" x1="324.0" y1="10" x2="324.0" y2="160"/>
+        <line class="gl k" x1="352.0" y1="10" x2="352.0" y2="160"/>
+        <line class="gl" x1="380.0" y1="10" x2="380.0" y2="160"/>
+        <line class="gl" x1="408.0" y1="10" x2="408.0" y2="160"/>
+        <line class="gl" x1="436.0" y1="10" x2="436.0" y2="160"/>
+        <rect class="bo" x="18.1" y="78.2" width="5.1" height="13.6" rx="1"/>
+        <rect class="bo" x="27.4" y="72.4" width="5.1" height="25.2" rx="1"/>
+        <rect class="bo" x="36.8" y="67.8" width="5.1" height="34.5" rx="1"/>
+        <rect class="bo" x="46.1" y="66.7" width="5.1" height="36.5" rx="1"/>
+        <rect class="bo" x="55.4" y="70.2" width="5.1" height="29.7" rx="1"/>
+        <rect class="bo" x="64.8" y="76.5" width="5.1" height="17.0" rx="1"/>
+        <rect class="bo" x="74.1" y="82.2" width="5.1" height="5.7" rx="1"/>
+        <rect class="bo" x="83.4" y="83.4" width="5.1" height="3.2" rx="1"/>
+        <rect class="bo" x="92.8" y="78.2" width="5.1" height="13.6" rx="1"/>
+        <rect class="bi" x="102.1" y="67.7" width="5.1" height="34.6" rx="1"/>
+        <rect class="bi" x="111.4" y="56.0" width="5.1" height="58.1" rx="1"/>
+        <rect class="bi" x="120.8" y="48.3" width="5.1" height="73.4" rx="1"/>
+        <rect class="bi" x="130.1" y="48.6" width="5.1" height="72.7" rx="1"/>
+        <rect class="bi" x="139.4" y="57.1" width="5.1" height="55.7" rx="1"/>
+        <rect class="bi" x="148.8" y="69.8" width="5.1" height="30.3" rx="1"/>
+        <rect class="bi" x="158.1" y="80.2" width="5.1" height="9.6" rx="1"/>
+        <rect class="bi" x="167.4" y="82.3" width="5.1" height="5.5" rx="1"/>
+        <rect class="bi" x="176.8" y="73.5" width="5.1" height="22.9" rx="1"/>
+        <rect class="bi" x="186.1" y="56.9" width="5.1" height="56.2" rx="1"/>
+        <rect class="bi" x="195.4" y="39.3" width="5.1" height="91.4" rx="1"/>
+        <rect class="bi" x="204.8" y="28.8" width="5.1" height="112.3" rx="1"/>
+        <rect class="bi" x="214.1" y="30.7" width="5.1" height="108.6" rx="1"/>
+        <rect class="bi" x="223.4" y="44.4" width="5.1" height="81.2" rx="1"/>
+        <rect class="bi" x="232.8" y="63.5" width="5.1" height="43.0" rx="1"/>
+        <rect class="bi" x="242.1" y="78.4" width="5.1" height="13.2" rx="1"/>
+        <rect class="bi" x="251.4" y="81.3" width="5.1" height="7.5" rx="1"/>
+        <rect class="bi" x="260.8" y="70.7" width="5.1" height="28.7" rx="1"/>
+        <rect class="bi" x="270.1" y="52.9" width="5.1" height="64.2" rx="1"/>
+        <rect class="bi" x="279.4" y="37.1" width="5.1" height="95.8" rx="1"/>
+        <rect class="bi" x="288.8" y="30.9" width="5.1" height="108.1" rx="1"/>
+        <rect class="bi" x="298.1" y="37.0" width="5.1" height="96.1" rx="1"/>
+        <rect class="bi" x="307.4" y="52.0" width="5.1" height="65.9" rx="1"/>
+        <rect class="bi" x="316.8" y="69.0" width="5.1" height="31.9" rx="1"/>
+        <rect class="bi" x="326.1" y="80.6" width="5.1" height="8.9" rx="1"/>
+        <rect class="bi" x="335.4" y="82.4" width="5.1" height="5.3" rx="1"/>
+        <rect class="bi" x="344.8" y="75.0" width="5.1" height="20.0" rx="1"/>
+        <rect class="bi" x="354.1" y="63.3" width="5.1" height="43.4" rx="1"/>
+        <rect class="bo" x="363.4" y="53.5" width="5.1" height="63.0" rx="1"/>
+        <rect class="bo" x="372.8" y="50.4" width="5.1" height="69.3" rx="1"/>
+        <rect class="bo" x="382.1" y="55.1" width="5.1" height="59.7" rx="1"/>
+        <rect class="bo" x="391.4" y="65.2" width="5.1" height="39.7" rx="1"/>
+        <rect class="bo" x="400.8" y="75.8" width="5.1" height="18.5" rx="1"/>
+        <rect class="bo" x="410.1" y="82.6" width="5.1" height="4.9" rx="1"/>
+        <rect class="bo" x="419.4" y="83.5" width="5.1" height="3.0" rx="1"/>
+        <rect class="bo" x="428.8" y="79.6" width="5.1" height="10.8" rx="1"/>
+        <rect class="bo" x="438.1" y="74.0" width="5.1" height="22.0" rx="1"/>
+        <rect class="bo" x="447.4" y="70.1" width="5.1" height="29.9" rx="1"/>
+        <rect class="bo" x="456.8" y="69.8" width="5.1" height="30.3" rx="1"/>
+        <rect class="ov" x="4" y="4" width="92.6" height="162"/>
+        <rect class="ov" x="365.4" y="4" width="110.6" height="162"/>
+        <line class="hd" x1="96.6" y1="4" x2="96.6" y2="166"/><rect class="tab" x="95.1" y="4" width="16" height="22" rx="2"/>
+        <line class="hd" x1="365.4" y1="4" x2="365.4" y2="166"/><rect class="tab" x="350.9" y="144" width="16" height="22" rx="2"/>
+        <text class="s wl" x="116.6" y="20">start</text><text class="s wl" x="345.4" y="160" text-anchor="end">end</text>
+        </svg>
+        <figcaption>The waveform with its two handles. The dimmed ends are cut off.</figcaption>
+      </figure>
+      <p data-c="C104">Drag the start and end handles on the waveform, or tap to move the nearest one.</p>
+      <p data-c="C105">Start, End, Length and Size readouts follow along; size counts 96 KB per second of sound.</p>
+
+      <h3>Shape</h3>
+      <p data-c="C106"><b>Normalize</b>, on by default, sets the selection's peak to ‑0.3 dBFS.</p>
+      <p data-c="C107"><b>Fades</b>, on by default, add a 2 ms fade at each end so the cut points don't click.</p>
+      <p data-c="C108"><b>Play</b> auditions the trimmed clip with those settings; <b>Stop</b> stops it.</p>
+
+      <h3>Name, send, save, share</h3>
+      <p data-c="C109"><b>Name on Rytm</b> starts as the file's name, cleaned to Rytm rules.</p>
+      <p data-c="C110"><b>Send</b> goes to the folder open on the Rytm tab. Rytm not connected? Chop says so and offers <b>Go to Rytm</b>.</p>
+      <p data-c="C111"><b>Save</b> writes the chop to Music/Rytm Mobile/Chops as a 48 kHz 16‑bit mono WAV, the same audio Send puts on the Rytm. Saving the same name again doesn't overwrite the earlier one.</p>
+      <p data-c="C112"><b>Share</b> sends a WAV copy through Android's share sheet.</p>
+      <p data-c="C113">Saving needs no storage permission: files go through Android's MediaStore.</p>
+    </div>
+  </section>
+
+  <!-- UNMERGED:record -->
+  <section class="module" id="record" aria-labelledby="h-record">
+    <div class="module-head"><span class="jack j-cv" aria-hidden="true"></span><h2 id="h-record">Record</h2><span class="tag">mic or USB audio</span></div>
+    <div class="module-body">
+      <p data-c="C114">Record straight into the phone, from its own microphone or from a USB audio input.</p>
+      <p data-c="C115">Then the recording goes through the whole process like any other sound: chop it, split it, save it, or send it to the Rytm.</p>
+      <figure class="flow" data-cref="C114 C115">
+        <svg class="wide" viewBox="0 0 620 200" role="img" aria-labelledby="f6w-t">
+        <title id="f6w-t">Record: the mic or a USB audio input goes into Record. A take goes on to Chop, where Send puts it on the Rytm, to Split, or to the phone with Save and Share.</title>
+        <rect class="mod" x="10" y="20" width="160" height="60" rx="4"/><text class="t" x="24" y="46">Mic</text><text class="s" x="24" y="66">on the phone</text>
+        <rect class="mod" x="10" y="120" width="160" height="60" rx="4"/><text class="t" x="24" y="146">USB audio in</text><text class="s" x="24" y="166">interface</text>
+        <rect class="mod" x="250" y="70" width="140" height="60" rx="4"/><text class="t" x="264" y="96">Record</text><text class="s" x="264" y="116">into the phone</text>
+        <rect class="mod" x="470" y="10" width="140" height="50" rx="4"/><text class="t" x="484" y="31">Chop</text><text class="s" x="484" y="51">trim, send</text>
+        <rect class="mod" x="470" y="75" width="140" height="50" rx="4"/><text class="t" x="484" y="96">Split</text><text class="s" x="484" y="116">stems</text>
+        <rect class="mod" x="470" y="140" width="140" height="50" rx="4"/><text class="t" x="484" y="161">Phone</text><text class="s" x="484" y="181">save, share</text>
+        <path class="cab c" d="M170 50 C 210 50, 210 92, 250 92"/>
+        <path class="cab c" d="M170 150 C 210 150, 210 108, 250 108"/>
+        <path class="cab c" d="M390 84 C 430 84, 430 35, 470 35"/>
+        <path class="cab a" d="M390 100 C 420 100, 440 100, 470 100"/>
+        <path class="cab n" d="M390 116 C 430 116, 430 165, 470 165"/>
+        <g><circle class="jk" cx="170" cy="50" r="7"/><circle class="hole" cx="170" cy="50" r="3"/><circle class="plug c" cx="170" cy="50" r="5"/></g>
+        <g><circle class="jk" cx="170" cy="150" r="7"/><circle class="hole" cx="170" cy="150" r="3"/><circle class="plug c" cx="170" cy="150" r="5"/></g>
+        <g><circle class="jk" cx="250" cy="92" r="7"/><circle class="hole" cx="250" cy="92" r="3"/><circle class="plug c" cx="250" cy="92" r="5"/></g>
+        <g><circle class="jk" cx="250" cy="108" r="7"/><circle class="hole" cx="250" cy="108" r="3"/><circle class="plug c" cx="250" cy="108" r="5"/></g>
+        <g><circle class="jk" cx="390" cy="84" r="7"/><circle class="hole" cx="390" cy="84" r="3"/><circle class="plug c" cx="390" cy="84" r="5"/></g>
+        <g><circle class="jk" cx="470" cy="35" r="7"/><circle class="hole" cx="470" cy="35" r="3"/><circle class="plug c" cx="470" cy="35" r="5"/></g>
+        <g><circle class="jk" cx="390" cy="100" r="7"/><circle class="hole" cx="390" cy="100" r="3"/><circle class="plug a" cx="390" cy="100" r="5"/></g>
+        <g><circle class="jk" cx="470" cy="100" r="7"/><circle class="hole" cx="470" cy="100" r="3"/><circle class="plug a" cx="470" cy="100" r="5"/></g>
+        <g><circle class="jk" cx="390" cy="116" r="7"/><circle class="hole" cx="390" cy="116" r="3"/><circle class="plug n" cx="390" cy="116" r="5"/></g>
+        <g><circle class="jk" cx="470" cy="165" r="7"/><circle class="hole" cx="470" cy="165" r="3"/><circle class="plug n" cx="470" cy="165" r="5"/></g>
+        </svg>
+        <svg class="tall" viewBox="0 0 340 300" role="img" aria-labelledby="f6t-t">
+        <title id="f6t-t">Record: the mic or a USB audio input goes into Record. A take goes on to Chop, where Send puts it on the Rytm, to Split, or to the phone with Save and Share.</title>
+        <rect class="mod" x="10" y="10" width="150" height="56" rx="4"/><text class="t" x="24" y="34">Mic</text><text class="s" x="24" y="54">on the phone</text>
+        <rect class="mod" x="180" y="10" width="150" height="56" rx="4"/><text class="t" x="194" y="34">USB audio in</text><text class="s" x="194" y="54">interface</text>
+        <rect class="mod" x="95" y="106" width="150" height="70" rx="4"/><text class="t" x="109" y="136">Record</text><text class="s" x="109" y="156">into the phone</text>
+        <rect class="mod" x="10" y="240" width="100" height="50" rx="4"/><text class="t" x="24" y="261">Chop</text><text class="s" x="24" y="281">trim, send</text>
+        <rect class="mod" x="120" y="240" width="100" height="50" rx="4"/><text class="t" x="134" y="261">Split</text><text class="s" x="134" y="281">stems</text>
+        <rect class="mod" x="230" y="240" width="100" height="50" rx="4"/><text class="t" x="244" y="261">Phone</text><text class="s" x="244" y="281">save, share</text>
+        <path class="cab c" d="M85 66 C 85 92, 140 80, 140 106"/>
+        <path class="cab c" d="M255 66 C 255 92, 200 80, 200 106"/>
+        <path class="cab c" d="M130 176 C 130 210, 60 205, 60 240"/>
+        <path class="cab a" d="M170 176 C 175 200, 165 215, 170 240"/>
+        <path class="cab n" d="M210 176 C 210 210, 280 205, 280 240"/>
+        <g><circle class="jk" cx="85" cy="66" r="7"/><circle class="hole" cx="85" cy="66" r="3"/><circle class="plug c" cx="85" cy="66" r="5"/></g>
+        <g><circle class="jk" cx="255" cy="66" r="7"/><circle class="hole" cx="255" cy="66" r="3"/><circle class="plug c" cx="255" cy="66" r="5"/></g>
+        <g><circle class="jk" cx="140" cy="106" r="7"/><circle class="hole" cx="140" cy="106" r="3"/><circle class="plug c" cx="140" cy="106" r="5"/></g>
+        <g><circle class="jk" cx="200" cy="106" r="7"/><circle class="hole" cx="200" cy="106" r="3"/><circle class="plug c" cx="200" cy="106" r="5"/></g>
+        <g><circle class="jk" cx="130" cy="176" r="7"/><circle class="hole" cx="130" cy="176" r="3"/><circle class="plug c" cx="130" cy="176" r="5"/></g>
+        <g><circle class="jk" cx="60" cy="240" r="7"/><circle class="hole" cx="60" cy="240" r="3"/><circle class="plug c" cx="60" cy="240" r="5"/></g>
+        <g><circle class="jk" cx="170" cy="176" r="7"/><circle class="hole" cx="170" cy="176" r="3"/><circle class="plug a" cx="170" cy="176" r="5"/></g>
+        <g><circle class="jk" cx="170" cy="240" r="7"/><circle class="hole" cx="170" cy="240" r="3"/><circle class="plug a" cx="170" cy="240" r="5"/></g>
+        <g><circle class="jk" cx="210" cy="176" r="7"/><circle class="hole" cx="210" cy="176" r="3"/><circle class="plug n" cx="210" cy="176" r="5"/></g>
+        <g><circle class="jk" cx="280" cy="240" r="7"/><circle class="hole" cx="280" cy="240" r="3"/><circle class="plug n" cx="280" cy="240" r="5"/></g>
+        </svg>
+        <figcaption>From the mic or a USB audio input, through Record, on to Chop or Split like any other sound, or saved and shared as recorded.</figcaption>
+      </figure>
+    </div>
+  </section>
+  <!-- /UNMERGED:record -->
+
+  <!-- ===================== SPLIT ===================== -->
+  <section class="module" id="split" aria-labelledby="h-split">
+    <div class="module-head"><span class="jack j-audio" aria-hidden="true"></span><h2 id="h-split">Split</h2><span class="tag">stems, on your computer</span></div>
+    <div class="module-body">
+      <p data-c="C116">Split separates a track into stems. The splitting runs on your own Mac or Linux computer, which the phone reaches on your home Wi‑Fi or over Tailscale.</p>
+      <figure class="flow" data-cref="C117">
+        <svg class="wide" viewBox="0 0 640 262" role="img" aria-labelledby="f3w-t">
+        <title id="f3w-t">Split: one track goes in and comes back as stems: drums, bass, guitar, piano, other and vocals.</title>
+        <path class="wv" d="M20 130 L52 130 L58 112 L64 150 L70 84 L78 178 L86 68 L94 188 L102 96 L110 162 L118 112 L126 146 L134 122 L142 138 L150 128 L200 130"/>
+        <path class="cab s" d="M200 130 C 300 130, 360 25, 470 25"/>
+        <path class="cab c" d="M200 130 C 300 130, 360 67, 470 67"/>
+        <path class="cab n" d="M200 130 C 300 130, 360 109, 470 109"/>
+        <path class="cab n" d="M200 130 C 300 130, 360 151, 470 151"/>
+        <path class="cab n" d="M200 130 C 300 130, 360 193, 470 193"/>
+        <path class="cab a" d="M200 130 C 300 130, 360 235, 470 235"/>
+        <g><circle class="jk" cx="470" cy="25" r="7"/><circle class="hole" cx="470" cy="25" r="3"/><circle class="plug s" cx="470" cy="25" r="5"/></g>
+        <text class="t" x="488" y="31">drums</text>
+        <g><circle class="jk" cx="470" cy="67" r="7"/><circle class="hole" cx="470" cy="67" r="3"/><circle class="plug c" cx="470" cy="67" r="5"/></g>
+        <text class="t" x="488" y="73">bass</text>
+        <g><circle class="jk" cx="470" cy="109" r="7"/><circle class="hole" cx="470" cy="109" r="3"/><circle class="plug n" cx="470" cy="109" r="5"/></g>
+        <text class="t" x="488" y="115">guitar</text>
+        <g><circle class="jk" cx="470" cy="151" r="7"/><circle class="hole" cx="470" cy="151" r="3"/><circle class="plug n" cx="470" cy="151" r="5"/></g>
+        <text class="t" x="488" y="157">piano</text>
+        <g><circle class="jk" cx="470" cy="193" r="7"/><circle class="hole" cx="470" cy="193" r="3"/><circle class="plug n" cx="470" cy="193" r="5"/></g>
+        <text class="t" x="488" y="199">other</text>
+        <g><circle class="jk" cx="470" cy="235" r="7"/><circle class="hole" cx="470" cy="235" r="3"/><circle class="plug a" cx="470" cy="235" r="5"/></g>
+        <text class="t" x="488" y="241">vocals</text>
+        </svg>
+        <svg class="tall" viewBox="0 0 340 320" role="img" aria-labelledby="f3t-t">
+        <title id="f3t-t">Split: one track goes in and comes back as stems: drums, bass, guitar, piano, other and vocals.</title>
+        <path class="wv" d="M10 160 L30 160 L35 146 L40 176 L45 124 L51 196 L57 112 L63 204 L69 132 L75 186 L81 146 L87 172 L93 154 L99 166 L104 158 L120 160"/>
+        <path class="cab s" d="M120 160 C 170 160, 190 30, 240 30"/>
+        <path class="cab c" d="M120 160 C 170 160, 190 82, 240 82"/>
+        <path class="cab n" d="M120 160 C 170 160, 190 134, 240 134"/>
+        <path class="cab n" d="M120 160 C 170 160, 190 186, 240 186"/>
+        <path class="cab n" d="M120 160 C 170 160, 190 238, 240 238"/>
+        <path class="cab a" d="M120 160 C 170 160, 190 290, 240 290"/>
+        <g><circle class="jk" cx="240" cy="30" r="7"/><circle class="hole" cx="240" cy="30" r="3"/><circle class="plug s" cx="240" cy="30" r="5"/></g>
+        <text class="t" x="258" y="36">drums</text>
+        <g><circle class="jk" cx="240" cy="82" r="7"/><circle class="hole" cx="240" cy="82" r="3"/><circle class="plug c" cx="240" cy="82" r="5"/></g>
+        <text class="t" x="258" y="88">bass</text>
+        <g><circle class="jk" cx="240" cy="134" r="7"/><circle class="hole" cx="240" cy="134" r="3"/><circle class="plug n" cx="240" cy="134" r="5"/></g>
+        <text class="t" x="258" y="140">guitar</text>
+        <g><circle class="jk" cx="240" cy="186" r="7"/><circle class="hole" cx="240" cy="186" r="3"/><circle class="plug n" cx="240" cy="186" r="5"/></g>
+        <text class="t" x="258" y="192">piano</text>
+        <g><circle class="jk" cx="240" cy="238" r="7"/><circle class="hole" cx="240" cy="238" r="3"/><circle class="plug n" cx="240" cy="238" r="5"/></g>
+        <text class="t" x="258" y="244">other</text>
+        <g><circle class="jk" cx="240" cy="290" r="7"/><circle class="hole" cx="240" cy="290" r="3"/><circle class="plug a" cx="240" cy="290" r="5"/></g>
+        <text class="t" x="258" y="296">vocals</text>
+        </svg>
+        <figcaption>The 6‑stem split: one track in, six stems out.</figcaption>
+      </figure>
+
+      <h3>Modes</h3>
+      <div class="scroll">
+        <table class="stack">
+          <thead><tr><th scope="col">Mode</th><th scope="col">Stems</th><th scope="col">Model</th></tr></thead>
+          <tbody>
+            <tr data-c="C117"><td data-label="Mode">6 stems (Full band)</td><td data-label="Stems">drums, bass, guitar, piano, other, vocals.</td><td data-label="Model">BS‑RoFormer SW, or HTDemucs 6‑stem on computers that can't run it.</td></tr>
+            <tr data-c="C118"><td data-label="Mode">4 stems, fast (Fast)</td><td data-label="Stems">drums, bass, other, vocals.</td><td data-label="Model">HTDemucs.</td></tr>
+            <tr data-c="C119"><td data-label="Mode">Vocals</td><td data-label="Stems">vocal and instrumental.</td><td data-label="Model">Mel‑Band RoFormer, or BS‑RoFormer ViperX 1297.</td></tr>
+            <tr data-c="C120"><td data-label="Mode">Drum kit</td><td data-label="Stems">the drum stem split into kit pieces (the model lists kick, snare, toms, hats, ride and crash), plus the full‑band stems, with the whole drum stem kept as drums_full.</td><td data-label="Model">MDX23C DrumSep, run on the drum stem of the 6‑stem split.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p data-c="C029">The app only offers the split modes your computer can run.</p>
+
+      <h3>How a split runs</h3>
+      <ul class="rail">
+        <li data-c="C122">Pick a track or a video, screen recordings too. The phone uploads it with a progress bar.</li>
+        <li data-c="C123">The computer pulls out the sound with ffmpeg; any video is dropped.</li>
+        <li data-c="C124">Splits run one at a time. The app shows how many are queued ahead, then a moving signal path while the computer works.</li>
+        <li data-c="C125">Each stem comes back two ways: a Rytm‑ready 48 kHz mono WAV and a full-quality stereo FLAC.</li>
+      </ul>
+      <p data-c="C126">Close the app mid-split and <b>Resume last job</b> picks it up again.</p>
+      <p data-c="C127">If the computer restarts during a split, that split is marked failed, with a note to split it again. Finished splits survive restarts.</p>
+
+      <h3>Each stem</h3>
+      <p data-c="C128">Every stem has <b>Play</b>, <b>Chop</b>, <b>Save</b> and <b>Share</b>. Chop opens it in the Chop tab, ready to trim and send.</p>
+
+      <h3>Save to the phone</h3>
+      <div class="sheet">
+        <dl class="fields">
+          <div data-c="C129"><dt>Full quality</dt><dd>Stereo FLAC at 44.1 kHz, exactly as the computer split it. Best for a DAW. This is the default.</dd></div>
+          <div data-c="C130"><dt>Rytm-ready</dt><dd>48 kHz mono WAV, the file Send all starts from. Send all then normalizes and fades each stem, so the copy on the Rytm isn't identical to this file.</dd></div>
+          <div data-c="C131"><dt>Folders</dt><dd>Stems go to Music/Rytm Mobile/&lt;track&gt; (&lt;mode&gt;), one folder per split and mode, so two modes of one song don't overwrite each other. Saving the same split again replaces what the app saved before.</dd></div>
+          <div data-c="C132"><dt>Save all</dt><dd>Save all saves every stem in one go. A stem the computer has no FLAC for is saved as its 48 kHz WAV, and the app names it.</dd></div>
+          <div data-c="C133"><dt>Zip</dt><dd>The computer packs every stem into one zip, saved to Download/Rytm Mobile. A stem with no file in that format is left out and listed in MISSING.txt inside the zip.</dd></div>
+          <div data-c="C134"><dt>Share</dt><dd>Share any stem through Android's share sheet.</dd></div>
+        </dl>
+      </div>
+      <p data-c="C135">A split made before full-quality saving existed only has the WAV; the app switches to Rytm‑ready and says so.</p>
+
+      <h3>Send all to the Rytm</h3>
+      <p data-c="C136">With the Rytm connected, <b>Send all</b> makes a folder named after the track (its first 12 characters) in the folder open on the Rytm tab and sends every stem there, each normalized and faded. Then it opens that folder.</p>
+
+      <h3>History</h3>
+      <p data-c="C137">History lists every split on your computer, newest first, with its mode, how many stems came out and how long ago. Six show at first; <b>Show all</b> lists the rest.</p>
+      <p data-c="C138">Tap a split to reopen it and play, chop, save or send its stems again.</p>
+      <p data-c="C139"><b>Delete</b> removes a split from the computer; copies saved on the phone stay. A split that is still queued or running can't be deleted.</p>
+    </div>
+  </section>
+
+  <!-- ===================== YOUR COMPUTER ===================== -->
+  <section class="module" id="computer" aria-labelledby="h-computer">
+    <div class="module-head"><span class="jack j-audio" aria-hidden="true"></span><h2 id="h-computer">Your computer</h2><span class="tag">the stem server</span></div>
+    <div class="module-body">
+      <h3>Pairing</h3>
+      <p data-c="C140">Pair once with the installer's code, or type the server and token in. The app saves them only after the computer has answered.</p>
+      <p data-c="C051">Rytm Mobile opens on its Split tab, fills in the server and token, and checks that the computer answers.</p>
+      <p data-c="C141">Open Split later and it reconnects to the saved computer by itself, so History and your last split are there.</p>
+      <h3>On the computer</h3>
+      <ul>
+        <li data-c="C142">Every request carries the token, and the server refuses to start without one.</li>
+        <li data-c="C143">The server keeps one model in memory and works through splits in order.</li>
+        <li data-c="C144">The stem server cuts input to the first 30 minutes and refuses uploads over 2,048 MB.</li>
+        <li data-c="C032">The server won't start a new split when its disk has less than 2 GB free.</li>
+        <li data-c="C028">On an Intel Mac the 6‑stem split uses HTDemucs 6‑stem instead of BS‑RoFormer SW, because the newer model needs a newer PyTorch than Intel Macs can run.</li>
+        <li data-c="C034">On Linux with an NVIDIA card, the installer sets up the GPU build by itself. NVIDIA GPUs haven't been tested.</li>
+      </ul>
+      <h3>Its two commands</h3>
+      <p data-c="C146"><code>pair</code> shows the code again, using the Tailscale address when Tailscale is on the computer and the home network address otherwise.</p>
+      <p data-c="C147">Re-running the installer updates the server and keeps your token, splits and models. <code>uninstall</code> stops the server and moves its folder aside; it deletes nothing. uv, any Python that uv downloaded, uv's download cache and, on Linux, lingering stay as they are.</p>
+      <p class="more"><a href="./#setup">Step-by-step setup is on the download page.</a></p>
+    </div>
+  </section>
+
+  <!-- ===================== UPDATES ===================== -->
+  <section class="module" id="updates" aria-labelledby="h-updates">
+    <div class="module-head"><span class="jack" aria-hidden="true"></span><h2 id="h-updates">Updates</h2><span class="tag">SHA-256 checked</span></div>
+    <div class="module-body">
+      <p data-c="C149">The app reads this site's version.json when it starts and when you come back to it, at most every 6 hours.</p>
+      <p data-c="C150">A newer version shows an <b>Update</b> banner with its version and notes.</p>
+      <p data-c="C151"><b>Update</b> downloads the new APK and checks its SHA‑256 against version.json. If it doesn't match, the file is deleted and nothing is installed.</p>
+      <p data-c="C152">A good file goes to Android's own installer, so you confirm the install. Android installs it over your copy only if it's signed with the same key.</p>
+      <p data-c="C153">The first time, Android asks you to let Rytm Mobile install apps; the app opens that setting for you.</p>
+      <p data-c="C154">If the check fails, for example when you're offline, nothing pops up.</p>
+      <figure class="flow" data-cref="C151 C152">
+        <svg class="wide" viewBox="0 0 880 206" role="img" aria-labelledby="f4w-t">
+        <title id="f4w-t">Update: the app reads version.json on this site, downloads the APK, and checks its SHA‑256. A match goes to Android's installer, which asks you; no match is deleted.</title>
+        <rect class="mod" x="10" y="20" width="170" height="76" rx="4"/><text class="t" x="24" y="54">version.json</text><text class="s" x="24" y="74">this site</text>
+        <rect class="mod" x="240" y="20" width="170" height="76" rx="4"/><text class="t" x="254" y="54">Download</text><text class="s" x="254" y="74">APK</text>
+        <rect class="mod" x="470" y="20" width="170" height="76" rx="4"/><text class="t" x="484" y="54">SHA-256</text><text class="s" x="484" y="74">must match</text>
+        <rect class="mod" x="700" y="20" width="170" height="76" rx="4"/><text class="t" x="714" y="54">Installer</text><text class="s" x="714" y="74">Android asks you</text>
+        <rect class="mod" x="470" y="140" width="170" height="56" rx="4"/><text class="t" x="484" y="162">Deleted</text><text class="s" x="484" y="182">no match</text>
+        <path class="cab a" d="M180 58 C 200 92, 220 92, 240 58"/>
+        <path class="cab a" d="M410 58 C 430 92, 450 92, 470 58"/>
+        <path class="cab a" d="M640 58 C 660 92, 680 92, 700 58"/>
+        <path class="cab s" d="M555 96 C 575 112, 535 124, 555 140"/>
+        <g><circle class="jk" cx="180" cy="58" r="7"/><circle class="hole" cx="180" cy="58" r="3"/><circle class="plug a" cx="180" cy="58" r="5"/></g>
+        <g><circle class="jk" cx="240" cy="58" r="7"/><circle class="hole" cx="240" cy="58" r="3"/><circle class="plug a" cx="240" cy="58" r="5"/></g>
+        <g><circle class="jk" cx="410" cy="58" r="7"/><circle class="hole" cx="410" cy="58" r="3"/><circle class="plug a" cx="410" cy="58" r="5"/></g>
+        <g><circle class="jk" cx="470" cy="58" r="7"/><circle class="hole" cx="470" cy="58" r="3"/><circle class="plug a" cx="470" cy="58" r="5"/></g>
+        <g><circle class="jk" cx="640" cy="58" r="7"/><circle class="hole" cx="640" cy="58" r="3"/><circle class="plug a" cx="640" cy="58" r="5"/></g>
+        <g><circle class="jk" cx="700" cy="58" r="7"/><circle class="hole" cx="700" cy="58" r="3"/><circle class="plug a" cx="700" cy="58" r="5"/></g>
+        <g><circle class="jk" cx="555" cy="96" r="7"/><circle class="hole" cx="555" cy="96" r="3"/><circle class="plug s" cx="555" cy="96" r="5"/></g>
+        <g><circle class="jk" cx="555" cy="140" r="7"/><circle class="hole" cx="555" cy="140" r="3"/><circle class="plug s" cx="555" cy="140" r="5"/></g>
+        </svg>
+        <svg class="tall" viewBox="0 0 340 380" role="img" aria-labelledby="f4t-t">
+        <title id="f4t-t">Update: the app reads version.json on this site, downloads the APK, and checks its SHA‑256. A match goes to Android's installer, which asks you; no match is deleted.</title>
+        <rect class="mod" x="10" y="10" width="170" height="60" rx="4"/><text class="t" x="24" y="36">version.json</text><text class="s" x="24" y="56">this site</text>
+        <rect class="mod" x="10" y="110" width="170" height="60" rx="4"/><text class="t" x="24" y="136">Download</text><text class="s" x="24" y="156">APK</text>
+        <rect class="mod" x="10" y="210" width="170" height="60" rx="4"/><text class="t" x="24" y="236">SHA-256</text><text class="s" x="24" y="256">must match</text>
+        <rect class="mod" x="10" y="310" width="170" height="60" rx="4"/><text class="t" x="24" y="336">Installer</text><text class="s" x="24" y="356">Android asks you</text>
+        <rect class="mod" x="215" y="210" width="115" height="60" rx="4"/><text class="t" x="229" y="236">Deleted</text><text class="s" x="229" y="256">no match</text>
+        <path class="cab a" d="M95 70 C 115 85, 75 95, 95 110"/>
+        <path class="cab a" d="M95 170 C 115 185, 75 195, 95 210"/>
+        <path class="cab a" d="M95 270 C 115 285, 75 295, 95 310"/>
+        <path class="cab s" d="M180 240 C 190 262, 205 262, 215 240"/>
+        <g><circle class="jk" cx="95" cy="70" r="7"/><circle class="hole" cx="95" cy="70" r="3"/><circle class="plug a" cx="95" cy="70" r="5"/></g>
+        <g><circle class="jk" cx="95" cy="110" r="7"/><circle class="hole" cx="95" cy="110" r="3"/><circle class="plug a" cx="95" cy="110" r="5"/></g>
+        <g><circle class="jk" cx="95" cy="170" r="7"/><circle class="hole" cx="95" cy="170" r="3"/><circle class="plug a" cx="95" cy="170" r="5"/></g>
+        <g><circle class="jk" cx="95" cy="210" r="7"/><circle class="hole" cx="95" cy="210" r="3"/><circle class="plug a" cx="95" cy="210" r="5"/></g>
+        <g><circle class="jk" cx="95" cy="270" r="7"/><circle class="hole" cx="95" cy="270" r="3"/><circle class="plug a" cx="95" cy="270" r="5"/></g>
+        <g><circle class="jk" cx="95" cy="310" r="7"/><circle class="hole" cx="95" cy="310" r="3"/><circle class="plug a" cx="95" cy="310" r="5"/></g>
+        <g><circle class="jk" cx="180" cy="240" r="7"/><circle class="hole" cx="180" cy="240" r="3"/><circle class="plug s" cx="180" cy="240" r="5"/></g>
+        <g><circle class="jk" cx="215" cy="240" r="7"/><circle class="hole" cx="215" cy="240" r="3"/><circle class="plug s" cx="215" cy="240" r="5"/></g>
+        </svg>
+        <figcaption>Only a file whose SHA‑256 matches version.json reaches Android's installer.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- UNMERGED:support -->
+  <section class="module" id="support" aria-labelledby="h-support">
+    <div class="module-head"><span class="jack j-signal" aria-hidden="true"></span><h2 id="h-support">Support</h2><span class="tag">never locked</span></div>
+    <div class="module-body">
+      <p data-c="C155">Rytm Mobile is free software under the GPL‑3.0, and every feature works for everyone, whether you support it or not.</p>
+      <p data-c="C156">At the foot of the Rytm tab, connected or not, the About panel has a <b>Support</b> button and an <b>I've supported it</b> button. After you tap I've supported it, a thank-you line takes that button's place.</p>
+    </div>
+  </section>
+  <!-- /UNMERGED:support -->
+
+  <!-- ===================== LIMITS & STATUS ===================== -->
+  <section class="module" id="status" aria-labelledby="h-status">
+    <div class="module-head"><span class="jack" aria-hidden="true"></span><h2 id="h-status">Limits &amp; status</h2><span class="tag">what has been tried</span></div>
+    <div class="module-body">
+      <h3>Test status</h3>
+      <div class="scroll">
+        <table class="stack">
+          <thead><tr><th scope="col">Platform</th><th scope="col">Status</th></tr></thead>
+          <tbody>
+            <tr data-c="C157"><td data-label="Platform">Analog Rytm MK1 over USB‑MIDI, on a Galaxy Z Fold</td><td data-label="Status">Tested</td></tr>
+            <tr data-c="C158"><td data-label="Platform">Stem server on Apple‑silicon Macs, Intel Macs and Ubuntu 24.04</td><td data-label="Status">Tested</td></tr>
+            <tr data-c="C159"><td data-label="Platform">Analog Rytm MKII</td><td data-label="Status">Not tested (the protocol is the same in Elektroid)</td></tr>
+            <tr data-c="C160"><td data-label="Platform">NVIDIA GPUs</td><td data-label="Status">Not tested</td></tr>
+            <!-- UNMERGED:record --><tr data-c="C164"><td data-label="Platform">Recording (phone mic, USB audio)</td><td data-label="Status">Not yet tested on hardware</td></tr><!-- /UNMERGED:record -->
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Good to know</h3>
+      <ul>
+        <li data-c="C065"><span class="case">It only sends.</span> It lists, sends, makes folders and deletes samples on +Drive; it can't copy samples back off the Rytm.</li>
+        <li data-c="C089"><span class="case">Folders stay put.</span> Folders can't be deleted or renamed from the app, and samples can't be renamed.</li>
+        <li data-c="C066"><span class="case">Plain HTTP at home.</span> The phone talks to the stem server over plain HTTP, with the token on every request. Use it on your own Wi‑Fi or over Tailscale.</li>
+        <li data-c="C021"><span class="case">Phone.</span> Android 10 or newer, on a phone with USB host and MIDI support.</li>
+        <li data-c="C161"><span class="case">Permissions:</span> network access, and permission to install its own updates.<!-- UNMERGED:record --> Recording also asks to use the microphone.<!-- /UNMERGED:record --></li>
+      </ul>
+
+      <h3>Under the hood</h3>
+      <div data-c="C163">
+        <p>The stem server is a small FastAPI program. Its endpoints:</p>
+        <ul class="api">
+          <li><code>POST /jobs</code></li>
+          <li><code>GET /jobs</code></li>
+          <li><code>GET /jobs/{id}</code></li>
+          <li><code>GET /jobs/{id}/stems/{name}</code></li>
+          <li><code>GET /jobs/{id}/zip</code></li>
+          <li><code>DELETE /jobs/{id}</code></li>
+          <li><code>GET /models</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+</div>
+
+<footer>
+  <p>Facts on this page come from the app's own source code and tests, the stem server and its installer, and the README.</p>
+  <p data-c="C069">The transfer protocol is ported from <a href="https://github.com/dagargo/elektroid">Elektroid</a> (GPL‑3.0), so Rytm Mobile is GPL‑3.0 too.</p>
+  <p data-c="C070">Stems use BS‑RoFormer SW, Mel‑Band RoFormer, BS‑RoFormer ViperX, HTDemucs and MDX23C DrumSep through python-audio-separator. The models belong to their authors.</p>
+  <p data-c="C067">Not affiliated with Elektron.</p>
+</footer>
+</body>
+</html>

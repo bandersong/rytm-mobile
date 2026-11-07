@@ -1,0 +1,12 @@
+Self-hosted fonts for rytm-mobile.pages.dev. Each file is a byte-for-byte copy of the app's own
+font (android/app/src/main/res/font/), so the site and the app use the same type. No subsetting,
+no conversion. Licence: SIL Open Font License 1.1, full text in OFL.txt next to this file.
+
+File                     Family                   Version        Copyright (from the file's name table)
+barlow_sc_semibold.ttf   Barlow Semi Condensed    1.408          Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+barlow_sc_bold.ttf       Barlow Semi Condensed    1.408          Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+plex_mono.ttf            IBM Plex Mono            2.3            Copyright 2017 IBM Corp. All rights reserved.
+plex_mono_medium.ttf     IBM Plex Mono Medium     2.3            Copyright 2017 IBM Corp. All rights reserved.
+plex_sans.ttf            IBM Plex Sans (variable) 3.201          Copyright 2019 IBM Corp. All rights reserved.
+
+Licence URL in every file's name table (ID 14): http://scripts.sil.org/OFL
